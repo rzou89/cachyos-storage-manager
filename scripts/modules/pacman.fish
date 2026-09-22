@@ -26,12 +26,54 @@ function __csm_pacman_source_dir
     echo "/var/cache/pacman/pkg"
 end
 
+# Pacman's CacheDir does not support paths with spaces (each space is
+# treated as a list separator). We create a symlink without spaces under
+# CSM_TARGET and reference that in /etc/pacman.conf.
+function __csm_pacman_safe_root
+    if not set -q CSM_TARGET
+        echo "ERROR: CSM_TARGET is not set." >&2
+        return 1
+    end
+    echo "$CSM_TARGET/csm"
+end
+
 function __csm_pacman_target_dir
     if not set -q CSM_PACMAN_DIR
         echo "ERROR: CSM_PACMAN_DIR is not configured." >&2
         return 1
     end
+    set -l safe_root (__csm_pacman_safe_root); or return 1
+    echo "$safe_root/pacman/pkg"
+end
+
+function __csm_pacman_real_target_dir
     echo "$CSM_PACMAN_DIR/pkg"
+end
+
+function __csm_pacman_symlink_path
+    __csm_pacman_safe_root
+end
+
+function __csm_pacman_symlink_target
+    if set -q CSM_ROOT
+        echo "$CSM_ROOT"
+    else if set -q CSM_TARGET
+        echo "$CSM_TARGET/CachyOS Storage Data Migration"
+    else
+        echo ""
+    end
+end
+
+function __csm_pacman_validate_no_spaces
+    if set -q CSM_TARGET
+        if string match -q '* *' "$CSM_TARGET"
+            csm_error "CSM_TARGET contains spaces: $CSM_TARGET"
+            csm_error "Pacman CacheDir does not support spaces."
+            csm_error "Choose a target path without spaces."
+            return 1
+        end
+    end
+    return 0
 end
 
 function __csm_pacman_conf
@@ -65,7 +107,8 @@ function __csm_pacman_require_target
 end
 
 function __csm_pacman_is_configured
-    grep -q "CachyOS Storage Data Migration/pacman" /etc/pacman.conf 2>/dev/null
+    # Match either the old (with spaces) or new (symlink) path
+    grep -qE "CacheDir = .*/csm/pacman/pkg|CacheDir = .*CachyOS Storage Data Migration/pacman" /etc/pacman.conf 2>/dev/null
 end
 
 function __csm_pacman_count_pkg
@@ -85,10 +128,31 @@ function csm_pacman_status
     csm_section "Pacman Module Status"
 
     set -l source (__csm_pacman_source_dir)
-    set -l target (__csm_pacman_target_dir); or return 1
+    set -l real_target (__csm_pacman_real_target_dir); or return 1
+    set -l safe_root (__csm_pacman_safe_root); or return 1
+    set -l safe_target "$safe_root/pacman/pkg"
+    set -l symlink_target (__csm_pacman_symlink_target)
 
-    echo "Source : $source"
-    echo "Target : $target"
+    echo "Source     : $source"
+    echo "Real target: $real_target"
+    echo "Symlink    : $safe_root"
+    echo "CacheDir   : $safe_target"
+    echo ""
+
+    echo "=== Symlink ==="
+    if test -L "$safe_root"
+        set -l current (readlink "$safe_root")
+        echo "  $safe_root -> $current"
+        if test "$current" = "$symlink_target"
+            csm_ok "symlink correct"
+        else
+            csm_warn "symlink points elsewhere (expected: $symlink_target)"
+        end
+    else if test -e "$safe_root"
+        csm_warn "path exists but is not a symlink: $safe_root"
+    else
+        echo "  not present (run 'csm pacman migrate')"
+    end
     echo ""
 
     echo "=== Source cache ==="
@@ -101,11 +165,11 @@ function csm_pacman_status
     end
     echo ""
 
-    echo "=== Target cache ==="
-    if test -d "$target"
-        set -l size (du -sh "$target" 2>/dev/null | awk '{print $1}')
+    echo "=== Target cache (real) ==="
+    if test -d "$real_target"
+        set -l size (du -sh "$real_target" 2>/dev/null | awk '{print $1}')
         echo "  size  : $size"
-        echo "  files : "(__csm_pacman_count_pkg "$target")
+        echo "  files : "(__csm_pacman_count_pkg "$real_target")
     else
         echo "  not present (not migrated yet)"
     end
@@ -138,6 +202,10 @@ function csm_pacman_migrate
         return 1
     end
 
+    if not __csm_pacman_validate_no_spaces
+        return 1
+    end
+
     if __csm_pacman_is_running
         csm_error "pacman/paru/yay is running. Stop it first."
         return 1
@@ -153,8 +221,11 @@ function csm_pacman_migrate
     end
 
     set -l source (__csm_pacman_source_dir)
-    set -l target (__csm_pacman_target_dir); or return 1
+    set -l real_target (__csm_pacman_real_target_dir); or return 1
+    set -l safe_root (__csm_pacman_safe_root); or return 1
+    set -l safe_target "$safe_root/pacman/pkg"
     set -l conf (__csm_pacman_conf)
+    set -l symlink_target (__csm_pacman_symlink_target)
 
     if not test -d "$source"
         csm_error "Source cache does not exist: $source"
@@ -164,16 +235,19 @@ function csm_pacman_migrate
     set -l count (__csm_pacman_count_pkg "$source")
     set -l size (du -sh "$source" 2>/dev/null | awk '{print $1}')
 
-    echo "Source : $source ($size, $count files)"
-    echo "Target : $target"
-    echo "Config : $conf"
+    echo "Source     : $source ($size, $count files)"
+    echo "Real target: $real_target"
+    echo "Symlink    : $safe_root -> $symlink_target"
+    echo "CacheDir   : $safe_target (no spaces — pacman.conf limitation)"
+    echo "Config     : $conf"
     echo ""
     echo "This will:"
-    echo "  1. Copy packages from source to target (via rsync)"
-    echo "  2. Add two CacheDir lines to $conf"
+    echo "  1. Create symlink $safe_root"
+    echo "  2. Copy packages from source to target (via rsync)"
+    echo "  3. Add two CacheDir lines to $conf (using the symlink path)"
     echo "     - target first (for new downloads)"
     echo "     - original second (fallback)"
-    echo "  3. NOT delete anything from source"
+    echo "  4. NOT delete anything from source"
     echo ""
 
     if not csm_confirm "Proceed? (sudo required)" "N"
@@ -199,24 +273,48 @@ function csm_pacman_migrate
     end
     csm_ok "Config backup: $conf_backup"
 
-    # Prepare target
-    mkdir -p "$target"
+    # Create symlink (no spaces) if missing
+    if not test -L "$safe_root"
+        if test -e "$safe_root"
+            csm_error "Path exists but is not a symlink: $safe_root"
+            csm_error "Remove it manually, then retry."
+            return 1
+        end
+        sudo ln -s "$symlink_target" "$safe_root"
+        if test $status -ne 0
+            csm_error "Failed to create symlink: $safe_root"
+            return 1
+        end
+        csm_ok "Symlink created: $safe_root -> $symlink_target"
+    else
+        set -l current (readlink "$safe_root")
+        if test "$current" != "$symlink_target"
+            csm_error "Existing symlink points elsewhere:"
+            echo "  $safe_root -> $current"
+            echo "Expected: $symlink_target"
+            return 1
+        end
+        csm_ok "Symlink already present: $safe_root"
+    end
+
+    # Prepare real target
+    mkdir -p "$real_target"
     if test $status -ne 0
-        csm_error "Failed to create target: $target"
+        csm_error "Failed to create target: $real_target"
         return 1
     end
 
     # rsync
     echo ""
     echo "Copying packages (this may take a minute)..."
-    sudo rsync -aHAX --info=progress2 "$source/" "$target/"
+    sudo rsync -aHAX --info=progress2 "$source/" "$real_target/"
     if test $status -ne 0
         csm_error "rsync failed"
         return 1
     end
 
     # Verify
-    set -l target_count (__csm_pacman_count_pkg "$target")
+    set -l target_count (__csm_pacman_count_pkg "$real_target")
     if test "$target_count" -lt "$count"
         csm_error "Verification failed:"
         echo "  source files: $count"
@@ -249,7 +347,7 @@ function csm_pacman_migrate
         echo 'print("OK")'
     end > "$tmpscript"
 
-    sudo python3 "$tmpscript" "$target"
+    sudo python3 "$tmpscript" "$safe_target"
     set -l pyresult $status
     rm -f "$tmpscript"
 
@@ -285,7 +383,7 @@ function csm_pacman_migrate
     echo "       sudo pacman -Sy"
     echo ""
     echo "  3. Lihat file baru muncul di target:"
-    echo "       ls \"$target\" | head"
+    echo "       ls \"$safe_target\" | head"
     echo ""
     echo "  4. Kalau semua OK dan Anda yakin, hapus file lama:"
     echo "       csm pacman cleanup-old"
@@ -365,12 +463,14 @@ function csm_pacman_revert
     end
 
     set -l source (__csm_pacman_source_dir)
-    set -l target (__csm_pacman_target_dir); or return 1
+    set -l real_target (__csm_pacman_real_target_dir); or return 1
+    set -l safe_root (__csm_pacman_safe_root); or return 1
     set -l conf (__csm_pacman_conf)
 
     echo "This will:"
     echo "  1. Remove CSM CacheDir lines from $conf"
-    echo "  2. Optionally move data from $target back to $source"
+    echo "  2. Remove symlink $safe_root"
+    echo "  3. Optionally move data from $real_target back to $source"
     echo ""
 
     if not csm_confirm "Proceed?" "N"
@@ -415,7 +515,7 @@ function csm_pacman_revert
         echo 'print("OK")'
     end > "$tmpscript"
 
-    sudo python3 "$tmpscript" "$target"
+    sudo python3 "$tmpscript" "$real_target"
     set -l pyresult $status
     rm -f "$tmpscript"
 
@@ -425,14 +525,24 @@ function csm_pacman_revert
     end
     csm_ok "Removed CacheDir lines from $conf"
 
+    # Remove symlink
+    if test -L "$safe_root"
+        sudo rm "$safe_root"
+        if test $status -eq 0
+            csm_ok "Symlink removed: $safe_root"
+        else
+            csm_warn "Could not remove symlink: $safe_root"
+        end
+    end
+
     # Ask about data
-    if test -d "$target"
-        set -l count (__csm_pacman_count_pkg "$target")
+    if test -d "$real_target"
+        set -l count (__csm_pacman_count_pkg "$real_target")
         if test "$count" -gt 0
             echo ""
             if csm_confirm "Move $count files from target back to source?" "N"
                 mkdir -p "$source"
-                sudo rsync -aHAX "$target/" "$source/"
+                sudo rsync -aHAX "$real_target/" "$source/"
                 if test $status -eq 0
                     csm_ok "Data moved back"
                 else
@@ -440,7 +550,7 @@ function csm_pacman_revert
                 end
             else
                 echo "Data on target NOT moved."
-                echo "Location: $target"
+                echo "Location: $real_target"
             end
         end
     end
@@ -464,6 +574,9 @@ function __csm_pacman_help
     echo ""
     echo "Strategy: two CacheDir entries. Target first for new downloads,"
     echo "source second as fallback if the target drive is not mounted."
+    echo ""
+    echo "Note: pacman.conf does not support spaces in CacheDir. CSM creates"
+    echo "a symlink \$CSM_TARGET/csm -> \$CSM_ROOT and uses it in the config."
     echo ""
     echo "Requires sudo. Do not run while pacman/paru/yay is running."
 end
