@@ -22,6 +22,7 @@ source "$MODULES_DIR/common.fish"
 source "$MODULES_DIR/flatpak.fish"
 source "$MODULES_DIR/paru.fish"
 source "$MODULES_DIR/init.fish"
+source "$MODULES_DIR/flatpak-core.fish"
 
 # ------------------------------------------------------------
 # Bantuan
@@ -44,7 +45,7 @@ function csm_usage
     echo "  csm help            Show this help"
     echo ""
     echo "Modules:"
-    echo "  csm flatpak ...     Manage Flatpak data       (v0.2.0)"
+    echo "  csm flatpak ...     Manage Flatpak data       (v0.2.0+)"
     echo "  csm pacman  ...     Manage pacman cache       (planned)"
     echo "  csm paru    ...     Manage paru cache         (planned)"
     echo "  csm cache   ...     Manage user cache         (planned)"
@@ -216,12 +217,21 @@ function csm_main
             switch "$sub"
                 case "" help -h --help
                     csm_flatpak $rest
-                case "status" "--status"
+                case "status" "--status" "core-status"
                     # Status works even without config (degraded mode)
                     if test -f (csm_config_path)
                         csm_load_config
                     end
-                    csm_flatpak $rest
+                    if test "$sub" = "core-status"
+                        csm_flatpak_core_status
+                    else
+                        csm_flatpak $rest
+                    end
+                case "core-help"
+                    __csm_flatpak_core_help
+                case "relocate-core"
+                    csm_load_config; or return 1
+                    csm_flatpak_core_relocate $rest[2..-1]
                 case '*'
                     csm_load_config; or return 1
                     csm_flatpak $rest

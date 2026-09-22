@@ -253,5 +253,5 @@ function csm_config_backup
 end
 
 function csm_version
-    echo "0.4.1"
+    echo "0.5.0"
 end
