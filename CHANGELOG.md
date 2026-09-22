@@ -7,12 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-23
+
+### Added
+
+- `csm setup` — interactive first-time setup wizard
+  - Validates the target drive (absolute, exists, mounted, writable)
+  - Creates the `CachyOS Storage Data Migration/` structure
+  - Generates a fresh config
+  - Optionally migrates existing flatpak and paru data
+  - Enables the Flatpak watcher service
+- `csm relocate <path>` — move all CSM data to a new target drive
+  - Stops the watcher during the move and restarts it afterwards
+  - Backs up the current config
+  - Moves every module's data and updates all symlinks
+  - Asks before deleting the old data
+- `csm edit [show|open|validate]` — inspect, edit, and validate the config
+- `docs/tutorial.md` — step-by-step tutorial for non-programmers
+- Backward compatibility for older configs (`CSM_FLATPAK_DATA_DIR`,
+  `CSM_PARU_CLONE_DIR`, `CSM_PACMAN_CACHE_DIR`, `CSM_CACHE_TARGET`)
+
+### Changed
+
+- New on-disk layout: all module data now lives under
+  `<target>/CachyOS Storage Data Migration/<module>/`
+- New primary config variables: `CSM_ROOT`, `CSM_FLATPAK_DIR`,
+  `CSM_PARU_DIR`, `CSM_PACMAN_DIR`, `CSM_CACHE_DIR`
+- README rewritten to reflect the new commands and layout
+
 ## [0.3.0] - 2026-09-23
 
 ### Added
 
 - Paru module: `csm paru status`, `migrate`, `revert`
-- Symlink-based design: `~/.cache/paru/clone` -> `$CSM_PARU_CLONE_DIR`
+- Symlink-based design: `~/.cache/paru/clone` -> `$CSM_PARU_DIR`
 - Paru itself is not modified; symlink is transparent
 
 ## [0.2.0] - 2026-09-23
@@ -44,4 +72,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial foundation: CLI entry point (`csm`), config loader, setup/uninstall scripts
 - `csm version`, `csm help`, `csm status`, `csm doctor` commands
 - Example config file
-

@@ -1,20 +1,20 @@
 # CachyOS Storage Manager
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue)
+![Version](https://img.shields.io/badge/version-0.4.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Shell](https://img.shields.io/badge/shell-fish-4aae47)
 
 Unified storage manager for CachyOS and Arch Linux: move Flatpak data, pacman cache, paru cache, and user cache to another drive — with config-based migration instead of fragile symlinks.
 
-**Status: early development.** Foundation (CLI, config, setup) is complete. The Flatpak module is available as of v0.2.0. Other modules are being added incrementally.
+**New to CSM?** Read [docs/tutorial.md](docs/tutorial.md) first — it walks through first-time setup, daily use, and recovery.
 
 ## Planned Modules
 
 Module | Handles | Status
 ---|---|---
 `flatpak` | `~/.var/app`, `/var/lib/flatpak` | ✅ v0.2.0
-`pacman` | `/var/cache/pacman/pkg` | 🔜 planned
 `paru` | `~/.cache/paru/clone` | ✅ v0.3.0
+`pacman` | `/var/cache/pacman/pkg` | 🔜 planned
 `cache` | `~/.cache` (whitelist + blacklist) | 🔜 planned
 
 ## Requirements
@@ -34,40 +34,45 @@ The installer will:
 
   1. Copy the `csm` entry point to `~/.local/bin/csm`.
   2. Copy modules to `~/.local/share/cachyos-storage-manager/modules/`.
-  3. Copy the example config to `~/.config/cachyos-storage-manager/config.fish`.
-  4. Install and enable the Flatpak watcher user service (if `CSM_FLATPAK_WATCH=1`).
+  3. Copy an example config to `~/.config/cachyos-storage-manager/config.fish`.
+  4. Install and enable the Flatpak watcher user service.
 
-Then edit the config:
+Then run the interactive wizard:
 
-    $EDITOR ~/.config/cachyos-storage-manager/config.fish
+    csm setup
 
-Set `CSM_TARGET` to the directory on your target drive, for example:
+This will ask for the target drive and generate a proper config with the
+following structure on your target drive:
 
-    set -g CSM_TARGET "/mnt/DataCachyOS"
+    <target>/CachyOS Storage Data Migration/
+      ├── flatpak/
+      ├── paru/
+      ├── pacman/        (reserved)
+      └── data cache/    (reserved)
 
-## Uninstall
+## Commands
 
-    ./uninstall.fish
+    csm setup                    First-time setup wizard
+    csm relocate <path>          Move all data to a new target drive
+    csm edit [show|open|validate] Show, edit, or validate the config
+    csm status                   Overall status
+    csm doctor                   Check dependencies and service health
+    csm version                  Show version
+    csm help                     Show help
 
-The uninstaller stops and removes the Flatpak watcher service.
-Your data on the target drive is **not** deleted.
+### Flatpak module
 
-## Usage
+    csm flatpak status           Show installations, apps, disk usage
+    csm flatpak migrate          Move ~/.var/app data to target drive
+    csm flatpak migrate-core     Move /var/lib/flatpak apps to custom installation
+    csm flatpak cleanup          Remove unused refs from default installation
+    csm flatpak watch            Run the watcher in foreground
 
-    csm help                     # show help
-    csm version                  # show version
-    csm status                   # show overall status
-    csm doctor                   # check system health
+### Paru module
 
-    csm flatpak status           # Flatpak installation status + disk usage
-    csm flatpak migrate          # migrate ~/.var/app data to target drive
-    csm flatpak migrate-core     # move /var/lib/flatpak apps to custom installation
-    csm flatpak cleanup          # remove unused refs from default installation
-    csm flatpak watch            # run the watcher in foreground
-
-    csm paru status              # Paru clone symlink state + disk usage
-    csm paru migrate             # move ~/.cache/paru/clone to target and symlink
-    csm paru revert              # undo migration (for uninstall)
+    csm paru status              Show symlink state and disk usage
+    csm paru migrate             Move ~/.cache/paru/clone to target and symlink
+    csm paru revert              Undo migration (for uninstall)
 
 ## Flatpak Watcher
 
@@ -84,22 +89,29 @@ Check it:
     systemctl --user status csm-flatpak-watcher.service
     journalctl --user -u csm-flatpak-watcher.service -f
 
-`setup.fish` will enable it automatically when `CSM_FLATPAK_WATCH` is `1`.
+`csm setup` will enable it automatically. When `csm relocate` runs, the
+watcher is stopped, the data is moved, the config is updated, and the
+watcher is restarted.
 
 ## Configuration
 
 Config file: `~/.config/cachyos-storage-manager/config.fish`
+Edit with: `csm edit open`
 
 Variable | Default | Description
 ---|---|---
-`CSM_TARGET` | `/mnt/DataCachyOS` | Base directory on the target drive.
+`CSM_TARGET` | `/mnt/DataCachyOS` | Drive where CSM data lives.
+`CSM_ROOT` | `$CSM_TARGET/CachyOS Storage Data Migration` | Base folder on the target drive.
+`CSM_FLATPAK_DIR` | `$CSM_ROOT/flatpak` | Flatpak user data location.
+`CSM_FLATPAK_INSTALLATION` | `datacachyos` | Custom Flatpak installation name. Find with `flatpak --installations`.
+`CSM_FLATPAK_WATCH` | `1` | Enable the Flatpak watcher service.
+`CSM_PARU_DIR` | `$CSM_ROOT/paru` | Paru clone target (symlinked from `~/.cache/paru/clone`).
+`CSM_PACMAN_DIR` | `$CSM_ROOT/pacman` | Pacman cache location (reserved).
+`CSM_CACHE_DIR` | `$CSM_ROOT/data cache` | User cache target (reserved).
 `CSM_BACKUP_BEFORE_MIGRATE` | `1` | Create a backup before migrating.
-`CSM_FLATPAK_DATA_DIR` | `$CSM_TARGET/Flatpak Data` | Flatpak user data location.
-`CSM_FLATPAK_INSTALLATION` | `datacachyos` | Name of the custom Flatpak installation.
-`CSM_FLATPAK_WATCH` | `1` | Enable the Flatpak data watcher.
-`CSM_PACMAN_CACHE_DIR` | `$CSM_TARGET/pacman/pkg` | Pacman cache location.
-`CSM_PARU_CLONE_DIR` | `$CSM_TARGET/paru/clone` | Paru clone target (symlinked from `~/.cache/paru/clone`).
-`CSM_CACHE_TARGET` | `$CSM_TARGET/cache` | User cache target (reserved).
+
+Older configs that still use `CSM_FLATPAK_DATA_DIR` or
+`CSM_PARU_CLONE_DIR` are automatically supported.
 
 ## Design Principles
 
@@ -108,6 +120,11 @@ Variable | Default | Description
   3. **Confirm before destructive actions.**
   4. **Detect mount** — abort if the target drive is not mounted.
   5. **Never touch** `/usr`, `/etc`, or installed packages.
+
+## Documentation
+
+- [docs/tutorial.md](docs/tutorial.md) — step-by-step tutorial
+- [CHANGELOG.md](CHANGELOG.md) — version history
 
 ## License
 
