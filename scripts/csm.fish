@@ -204,7 +204,24 @@ function csm_main
                     csm_load_config; or return 1
                     csm_flatpak $rest
             end
-        case pacman paru cache
+        case paru
+            set -l sub ""
+            if test (count $rest) -gt 0
+                set sub $rest[1]
+            end
+            switch "$sub"
+                case "" help -h --help
+                    csm_paru $rest
+                case "status" "--status"
+                    if test -f (csm_config_path)
+                        csm_load_config
+                    end
+                    csm_paru $rest
+                case '*'
+                    csm_load_config; or return 1
+                    csm_paru $rest
+            end
+        case pacman cache
             csm_error "Module '$cmd' is not implemented yet."
             echo ""
             echo "Planned for a future version. See 'csm help'."
