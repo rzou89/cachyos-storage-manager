@@ -8,6 +8,8 @@ set -l APP_NAME "CachyOS Storage Manager"
 set -l INSTALL_DIR "$HOME/.local/bin"
 set -l SHARE_DIR "$HOME/.local/share/cachyos-storage-manager"
 set -l CONFIG_DIR "$HOME/.config/cachyos-storage-manager"
+set -l SYSTEMD_USER_DIR "$HOME/.config/systemd/user"
+set -l SERVICE_NAME "csm-flatpak-watcher.service"
 
 echo ""
 echo "========================================"
@@ -19,6 +21,27 @@ read -P "Remove $APP_NAME? [y/N]: " confirm
 if not string match -qi "y*" "$confirm"
     echo "Uninstall cancelled."
     exit 0
+end
+
+# ------------------------------------------------------------
+# systemd user service
+# ------------------------------------------------------------
+
+set -l TARGET_SERVICE "$SYSTEMD_USER_DIR/$SERVICE_NAME"
+
+if test -f "$TARGET_SERVICE"
+    if command -sq systemctl
+        systemctl --user disable --now "$SERVICE_NAME" 2>/dev/null
+        echo "Stopped: $SERVICE_NAME"
+    end
+
+    rm -f "$TARGET_SERVICE"
+    echo "Removed: $TARGET_SERVICE"
+
+    if command -sq systemctl
+        systemctl --user daemon-reload
+        echo "OK: systemctl --user daemon-reload"
+    end
 end
 
 # ------------------------------------------------------------

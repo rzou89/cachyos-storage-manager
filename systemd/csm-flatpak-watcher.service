@@ -1,0 +1,13 @@
+[Unit]
+Description=CachyOS Storage Manager - Flatpak data watcher
+Documentation=https://github.com/rzou89/cachyos-storage-manager
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/csm flatpak watch
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
