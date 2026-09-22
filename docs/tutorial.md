@@ -142,6 +142,26 @@ What happens:
 
 ---
 
+## 5b. Moving the Flatpak core installation
+
+> **Warning:** This touches `/etc/flatpak/installations.d/` and requires
+> `sudo`. If something goes wrong, your Flatpak apps will not start until
+> you fix it. `csm` verifies after the move and rolls back automatically
+> on failure.
+
+The **Flatpak core** is the installation directory where Flatpak stores
+application binaries, runtimes, and the OSTree repo. It is registered in
+`/etc/flatpak/installations.d/<name>.conf`.
+
+By default `csm setup` does **not** move it — it only creates a folder
+placeholder. Use `csm flatpak relocate-core` to move it.
+
+### Preview first (dry run)
+
+```fish
+csm flatpak relocate-core --dry-run \
+    "/mnt/NewDrive/CachyOS Storage Data Migration/Flatpak/Flatpak Core"
+    
 ## 6. Editing the config
 
 ```fish
