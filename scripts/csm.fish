@@ -23,6 +23,7 @@ source "$MODULES_DIR/flatpak.fish"
 source "$MODULES_DIR/paru.fish"
 source "$MODULES_DIR/init.fish"
 source "$MODULES_DIR/flatpak-core.fish"
+source "$MODULES_DIR/pacman.fish"
 
 # ------------------------------------------------------------
 # Bantuan
@@ -46,7 +47,7 @@ function csm_usage
     echo ""
     echo "Modules:"
     echo "  csm flatpak ...     Manage Flatpak data       (v0.2.0+)"
-    echo "  csm pacman  ...     Manage pacman cache       (planned)"
+    echo "  csm pacman  ...     Manage pacman cache       (v0.6.0)"
     echo "  csm paru    ...     Manage paru cache         (planned)"
     echo "  csm cache   ...     Manage user cache         (planned)"
     echo ""
@@ -253,7 +254,24 @@ function csm_main
                     csm_load_config; or return 1
                     csm_paru $rest
             end
-        case pacman cache
+        case pacman
+            set -l sub ""
+            if test (count $rest) -gt 0
+                set sub $rest[1]
+            end
+            switch "$sub"
+                case "" help -h --help
+                    csm_pacman $rest
+                case "status" "--status"
+                    if test -f (csm_config_path)
+                        csm_load_config
+                    end
+                    csm_pacman $rest
+                case '*'
+                    csm_load_config; or return 1
+                    csm_pacman $rest
+            end
+        case cache
             csm_error "Module '$cmd' is not implemented yet."
             echo ""
             echo "Planned for a future version. See 'csm help'."
