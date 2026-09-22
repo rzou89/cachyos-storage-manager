@@ -48,7 +48,7 @@ function csm_usage
     echo "Modules:"
     echo "  csm flatpak ...     Manage Flatpak data       (v0.2.0+)"
     echo "  csm pacman  ...     Manage pacman cache       (v0.6.0)"
-    echo "  csm paru    ...     Manage paru cache         (planned)"
+    echo "  csm paru    ...     Manage paru cache         (v0.3.0)"
     echo "  csm cache   ...     Manage user cache         (planned)"
     echo ""
 end
