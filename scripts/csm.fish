@@ -20,6 +20,7 @@ source "$MODULES_DIR/common.fish"
 
 # Load modules
 source "$MODULES_DIR/flatpak.fish"
+source "$MODULES_DIR/paru.fish"
 
 # ------------------------------------------------------------
 # Bantuan
