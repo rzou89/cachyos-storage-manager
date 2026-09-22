@@ -1,0 +1,25 @@
+# User config
+config/config.fish
+
+# Backups
+*.backup
+*.backup-*
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Python (untuk tooling kalau perlu)
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log

@@ -1,0 +1,62 @@
+# ============================================================
+# CachyOS Storage Manager - Configuration
+#
+# Copy this file to:
+#   ~/.config/cachyos-storage-manager/config.fish
+#
+# Then edit the paths below to match your system.
+# ============================================================
+
+# ------------------------------------------------------------
+# Global
+# ------------------------------------------------------------
+
+# Base directory on the target drive where everything is stored.
+# Must be on a different filesystem than your root drive.
+# Must be an absolute path.
+set -g CSM_TARGET "/mnt/DataCachyOS"
+
+# Create a backup before migrating? (1 = yes, 0 = no)
+set -g CSM_BACKUP_BEFORE_MIGRATE 1
+
+# ------------------------------------------------------------
+# Flatpak
+# ------------------------------------------------------------
+
+# Directory where Flatpak application user data is stored.
+set -g CSM_FLATPAK_DATA_DIR "$CSM_TARGET/Flatpak Data"
+
+# Name of the custom Flatpak installation.
+set -g CSM_FLATPAK_INSTALLATION "cachyos"
+
+# Enable the Flatpak data watcher? (1 = yes, 0 = no)
+set -g CSM_FLATPAK_WATCH 1
+
+# ------------------------------------------------------------
+# Pacman
+# ------------------------------------------------------------
+
+# Directory where pacman package cache is stored.
+set -g CSM_PACMAN_CACHE_DIR "$CSM_TARGET/pacman/pkg"
+
+# ------------------------------------------------------------
+# Paru
+# ------------------------------------------------------------
+
+# Directory where paru clones AUR repositories.
+set -g CSM_PARU_CLONE_DIR "$CSM_TARGET/paru/clone"
+
+# ------------------------------------------------------------
+# User Cache (reserved for future version, not used yet)
+# ------------------------------------------------------------
+
+set -g CSM_CACHE_TARGET "$CSM_TARGET/cache"
+
+# Folders under ~/.cache to migrate.
+set -g CSM_CACHE_MIGRATE paru yay thumbnails mozilla chromium \
+    BraveSoftware spotify discord telegram Code JetBrains \
+    pip npm yarn go-build
+
+# Folders under ~/.cache to NEVER migrate.
+set -g CSM_CACHE_SKIP mesa_shader_cache mesa_shader_cache_db \
+    fontconfig dconf ibus fcitx5
