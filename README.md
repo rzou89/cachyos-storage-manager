@@ -1,5 +1,9 @@
 # CachyOS Storage Manager
 
+![Version](https://img.shields.io/badge/version-0.2.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Shell](https://img.shields.io/badge/shell-fish-4aae47)
+
 Unified storage manager for CachyOS and Arch Linux: move Flatpak data, pacman cache, paru cache, and user cache to another drive — with config-based migration instead of fragile symlinks.
 
 **Status: early development.** Foundation (CLI, config, setup) is complete. The Flatpak module is available as of v0.2.0. Other modules are being added incrementally.
