@@ -14,7 +14,7 @@ Module | Handles | Status
 ---|---|---
 `flatpak` | `~/.var/app`, `/var/lib/flatpak` | ✅ v0.2.0
 `pacman` | `/var/cache/pacman/pkg` | 🔜 planned
-`paru` | `~/.cache/paru/clone` | 🔜 planned
+`paru` | `~/.cache/paru/clone` | ✅ v0.3.0
 `cache` | `~/.cache` (whitelist + blacklist) | 🔜 planned
 
 ## Requirements
