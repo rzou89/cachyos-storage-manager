@@ -125,7 +125,8 @@ function __csm_init_write_config
         echo "# Flatpak"
         echo "# ------------------------------------------------------------"
         echo ""
-        echo "set -g CSM_FLATPAK_DIR \"\$CSM_ROOT/flatpak\""
+        echo "set -g CSM_FLATPAK_DIR \"\$CSM_ROOT/Flatpak/Flatpak Data\""
+        echo "set -g CSM_FLATPAK_CORE_DIR \"\$CSM_ROOT/Flatpak/Flatpak Core\""
         echo "set -g CSM_FLATPAK_INSTALLATION \"$installation\""
         echo "set -g CSM_FLATPAK_WATCH $watch"
         echo ""
@@ -210,17 +211,23 @@ function csm_setup
     echo ""
     echo "Struktur folder yang akan dibuat:"
     echo "  $root/"
-    echo "    ├── flatpak/"
+    echo "    ├── Flatpak/"
+    echo "    │   ├── Flatpak Core/   (installation, isi manual dengan sudo)"
+    echo "    │   └── Flatpak Data/   (data user)"
     echo "    ├── paru/"
-    echo "    ├── pacman/        (reserved)"
-    echo "    └── data cache/    (reserved)"
+    echo "    ├── pacman/             (reserved)"
+    echo "    └── data cache/         (reserved)"
     echo ""
 
     if not csm_confirm "Lanjut?" "Y"
         return 1
     end
 
-    mkdir -p "$root/flatpak" "$root/paru" "$root/pacman" "$root/data cache"
+    mkdir -p "$root/Flatpak/Flatpak Core" \
+             "$root/Flatpak/Flatpak Data" \
+             "$root/paru" \
+             "$root/pacman" \
+             "$root/data cache"
     csm_ok "Folder dibuat"
 
     __csm_init_write_config "$target"
@@ -302,7 +309,8 @@ function csm_relocate
 
     set -l old_flatpak "$CSM_FLATPAK_DIR"
     set -l old_paru "$CSM_PARU_DIR"
-    set -l new_flatpak "$new_root/flatpak"
+    set -l new_flatpak "$new_root/Flatpak/Flatpak Data"
+    set -l new_flatpak_core "$new_root/Flatpak/Flatpak Core"
     set -l new_paru "$new_root/paru"
 
     echo ""
@@ -336,7 +344,7 @@ function csm_relocate
     end
 
     # Prepare new folders
-    mkdir -p "$new_flatpak" "$new_paru"
+    mkdir -p "$new_flatpak" "$new_flatpak_core" "$new_paru"
 
     # Relocate modules
     echo ""

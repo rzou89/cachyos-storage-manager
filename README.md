@@ -1,6 +1,6 @@
 # CachyOS Storage Manager
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-0.4.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Shell](https://img.shields.io/badge/shell-fish-4aae47)
 
@@ -45,10 +45,17 @@ This will ask for the target drive and generate a proper config with the
 following structure on your target drive:
 
     <target>/CachyOS Storage Data Migration/
-      ├── flatpak/
+      ├── Flatpak/
+      │   ├── Flatpak Core/   (installation, see below)
+      │   └── Flatpak Data/   (user data)
       ├── paru/
-      ├── pacman/        (reserved)
-      └── data cache/    (reserved)
+      ├── pacman/             (reserved)
+      └── data cache/         (reserved)
+
+The Flatpak **core** (application binaries, runtime, repo) is a separate
+Flatpak installation, registered in `/etc/flatpak/installations.d/`.
+By default `csm setup` does not move it — it only creates the folder
+placeholder. See the tutorial for moving it manually.
 
 ## Commands
 
@@ -102,7 +109,8 @@ Variable | Default | Description
 ---|---|---
 `CSM_TARGET` | `/mnt/DataCachyOS` | Drive where CSM data lives.
 `CSM_ROOT` | `$CSM_TARGET/CachyOS Storage Data Migration` | Base folder on the target drive.
-`CSM_FLATPAK_DIR` | `$CSM_ROOT/flatpak` | Flatpak user data location.
+`CSM_FLATPAK_DIR` | `$CSM_ROOT/Flatpak/Flatpak Data` | Flatpak user data location.
+`CSM_FLATPAK_CORE_DIR` | `$CSM_ROOT/Flatpak/Flatpak Core` | Flatpak installation path (reserved; `csm setup` only creates the folder).
 `CSM_FLATPAK_INSTALLATION` | `datacachyos` | Custom Flatpak installation name. Find with `flatpak --installations`.
 `CSM_FLATPAK_WATCH` | `1` | Enable the Flatpak watcher service.
 `CSM_PARU_DIR` | `$CSM_ROOT/paru` | Paru clone target (symlinked from `~/.cache/paru/clone`).

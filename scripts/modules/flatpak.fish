@@ -121,9 +121,55 @@ function csm_flatpak_migrate
 
         set app_id (basename "$app_dir")
 
-        # Already migrated
+        # Symlink handling: adopt, relink, or move
         if test -L "$app_dir"
-            echo "SKIP linked: $app_id"
+            set -l current_target (readlink "$app_dir")
+            set -l desired_target "$DEST/$app_id"
+
+            # Correct: symlink already points to target
+            if test "$current_target" = "$desired_target"
+                echo "SKIP linked (correct): $app_id"
+                continue
+            end
+
+            # Data already at new target, only the symlink is stale
+            if test -d "$desired_target"
+                echo "RELINK: $app_id"
+                echo "  from: $current_target"
+                echo "  to  : $desired_target"
+                rm "$app_dir"
+                ln -s "$desired_target" "$app_dir"
+                if test $status -eq 0
+                    echo "  OK: $app_id"
+                else
+                    echo "  ERROR: relink failed"
+                end
+                continue
+            end
+
+            # Data still at old target: move then relink
+            if test -d "$current_target"
+                echo "MOVE+RELINK: $app_id"
+                echo "  from: $current_target"
+                echo "  to  : $desired_target"
+                mkdir -p (dirname "$desired_target")
+                mv "$current_target" "$desired_target"
+                if test $status -ne 0
+                    echo "  ERROR: move failed, symlink untouched"
+                    continue
+                end
+                rm "$app_dir"
+                ln -s "$desired_target" "$app_dir"
+                if test $status -eq 0
+                    echo "  OK: $app_id"
+                else
+                    echo "  ERROR: relink failed, data is at $desired_target"
+                end
+                continue
+            end
+
+            # Broken symlink
+            echo "SKIP broken symlink: $app_id -> $current_target"
             continue
         end
 
@@ -335,7 +381,9 @@ function csm_flatpak_status
 
     set -l INSTALLATION (__csm_flatpak_installation)
     set -l DEST ""
-    if set -q CSM_FLATPAK_DATA_DIR
+    if set -q CSM_FLATPAK_DIR
+        set DEST "$CSM_FLATPAK_DIR"
+    else if set -q CSM_FLATPAK_DATA_DIR
         set DEST "$CSM_FLATPAK_DATA_DIR"
     end
 

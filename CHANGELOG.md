@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-23
+
+### Fixed
+
+- `csm flatpak status` now correctly shows the Flatpak data directory
+  (was reading only the legacy `CSM_FLATPAK_DATA_DIR` variable)
+- `csm flatpak migrate` now relinks existing symlinks that point to a
+  different target, so migrating to a new layout no longer requires
+  manual `rm`/`ln` per app
+- `csm setup` now creates the `Flatpak/Flatpak Core` and
+  `Flatpak/Flatpak Data` subfolders and writes both
+  `CSM_FLATPAK_DIR` and `CSM_FLATPAK_CORE_DIR`
+
+### Added
+
+- New config variable `CSM_FLATPAK_CORE_DIR` (Flatpak installation path,
+  default `$CSM_ROOT/Flatpak/Flatpak Core`)
+
+### Changed
+
+- `config.fish.example` now reflects the folder layout used by `csm setup`:
+  `<target>/CachyOS Storage Data Migration/Flatpak/{Flatpak Core,Flatpak Data}/`
+
 ## [0.4.0] - 2026-09-23
 
 ### Added

@@ -204,6 +204,14 @@ function csm_normalize_config
         end
     end
 
+    if not set -q CSM_FLATPAK_CORE_DIR
+        if set -q CSM_ROOT
+            set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/Flatpak/Flatpak Core"
+        else if set -q CSM_TARGET
+            set -g CSM_FLATPAK_CORE_DIR "$CSM_TARGET/CachyOS Storage Data Migration/Flatpak/Flatpak Core"
+        end
+    end
+
     if not set -q CSM_PARU_DIR
         if set -q CSM_PARU_CLONE_DIR
             set -g CSM_PARU_DIR "$CSM_PARU_CLONE_DIR"
