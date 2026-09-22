@@ -27,7 +27,7 @@ set -g CSM_BACKUP_BEFORE_MIGRATE 1
 set -g CSM_FLATPAK_DATA_DIR "$CSM_TARGET/Flatpak Data"
 
 # Name of the custom Flatpak installation.
-set -g CSM_FLATPAK_INSTALLATION "cachyos"
+set -g CSM_FLATPAK_INSTALLATION "datacachyos"
 
 # Enable the Flatpak data watcher? (1 = yes, 0 = no)
 set -g CSM_FLATPAK_WATCH 1

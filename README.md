@@ -87,7 +87,7 @@ Variable | Default | Description
 `CSM_TARGET` | `/mnt/DataCachyOS` | Base directory on the target drive.
 `CSM_BACKUP_BEFORE_MIGRATE` | `1` | Create a backup before migrating.
 `CSM_FLATPAK_DATA_DIR` | `$CSM_TARGET/Flatpak Data` | Flatpak user data location.
-`CSM_FLATPAK_INSTALLATION` | `cachyos` | Name of the custom Flatpak installation.
+`CSM_FLATPAK_INSTALLATION` | `datacachyos` | Name of the custom Flatpak installation.
 `CSM_FLATPAK_WATCH` | `1` | Enable the Flatpak data watcher.
 `CSM_PACMAN_CACHE_DIR` | `$CSM_TARGET/pacman/pkg` | Pacman cache location.
 `CSM_PARU_CLONE_DIR` | `$CSM_TARGET/paru/clone` | Paru clone location.
