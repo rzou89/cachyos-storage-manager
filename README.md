@@ -65,6 +65,10 @@ Your data on the target drive is **not** deleted.
     csm flatpak cleanup          # remove unused refs from default installation
     csm flatpak watch            # run the watcher in foreground
 
+    csm paru status              # Paru clone symlink state + disk usage
+    csm paru migrate             # move ~/.cache/paru/clone to target and symlink
+    csm paru revert              # undo migration (for uninstall)
+
 ## Flatpak Watcher
 
 The Flatpak module ships a user-level systemd service that watches
@@ -94,7 +98,7 @@ Variable | Default | Description
 `CSM_FLATPAK_INSTALLATION` | `datacachyos` | Name of the custom Flatpak installation.
 `CSM_FLATPAK_WATCH` | `1` | Enable the Flatpak data watcher.
 `CSM_PACMAN_CACHE_DIR` | `$CSM_TARGET/pacman/pkg` | Pacman cache location.
-`CSM_PARU_CLONE_DIR` | `$CSM_TARGET/paru/clone` | Paru clone location.
+`CSM_PARU_CLONE_DIR` | `$CSM_TARGET/paru/clone` | Paru clone target (symlinked from `~/.cache/paru/clone`).
 `CSM_CACHE_TARGET` | `$CSM_TARGET/cache` | User cache target (reserved).
 
 ## Design Principles

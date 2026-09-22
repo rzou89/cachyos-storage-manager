@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-23
+
+### Added
+
+- Paru module: `csm paru status`, `migrate`, `revert`
+- Symlink-based design: `~/.cache/paru/clone` -> `$CSM_PARU_CLONE_DIR`
+- Paru itself is not modified; symlink is transparent
+
 ## [0.2.0] - 2026-09-23
 
 ### Added
