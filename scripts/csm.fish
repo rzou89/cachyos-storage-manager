@@ -9,8 +9,17 @@
 set -l SCRIPT_DIR (dirname (status --current-filename))
 set -l MODULES_DIR "$SCRIPT_DIR/modules"
 
+# Fallback ke layout install (setup.fish):
+#   ~/.local/share/cachyos-storage-manager/modules/
+if not test -d "$MODULES_DIR"
+    set MODULES_DIR "$HOME/.local/share/cachyos-storage-manager/modules"
+end
+
 # Load common helpers
 source "$MODULES_DIR/common.fish"
+
+# Load modules
+source "$MODULES_DIR/flatpak.fish"
 
 # ------------------------------------------------------------
 # Bantuan
@@ -29,11 +38,11 @@ function csm_usage
     echo "  csm version         Show version"
     echo "  csm help            Show this help"
     echo ""
-    echo "Modules (available in later versions):"
-    echo "  csm flatpak ...     Manage Flatpak data"
-    echo "  csm pacman  ...     Manage pacman cache"
-    echo "  csm paru    ...     Manage paru cache"
-    echo "  csm cache   ...     Manage user cache"
+    echo "Modules:"
+    echo "  csm flatpak ...     Manage Flatpak data       (v0.2.0)"
+    echo "  csm pacman  ...     Manage pacman cache       (planned)"
+    echo "  csm paru    ...     Manage paru cache         (planned)"
+    echo "  csm cache   ...     Manage user cache         (planned)"
     echo ""
 end
 
@@ -81,6 +90,18 @@ function csm_cmd_status
             else
                 csm_error "Target directory does not exist: $CSM_TARGET"
             end
+
+            echo ""
+            echo "Flatpak"
+            if set -q CSM_FLATPAK_DATA_DIR
+                echo "  Data dir       : $CSM_FLATPAK_DATA_DIR"
+            end
+            if set -q CSM_FLATPAK_INSTALLATION
+                echo "  Installation   : $CSM_FLATPAK_INSTALLATION"
+            end
+            if set -q CSM_FLATPAK_WATCH
+                echo "  Watcher        : $CSM_FLATPAK_WATCH"
+            end
         end
     else
         csm_warn "Configuration file not found"
@@ -103,7 +124,7 @@ function csm_cmd_doctor
 
     # Dependencies
     echo "Dependencies:"
-    for cmd in fish flatpak pacman paru systemctl
+    for cmd in fish flatpak pacman paru systemctl inotifywait
         if csm_have $cmd
             csm_ok "$cmd"
         else
@@ -123,6 +144,22 @@ function csm_cmd_doctor
         csm_warn "config file missing"
     end
 
+    # Flatpak watcher service
+    echo ""
+    echo "Flatpak watcher service:"
+    if csm_have systemctl
+        if systemctl --user is-enabled csm-flatpak-watcher.service >/dev/null 2>&1
+            csm_ok "csm-flatpak-watcher.service is enabled"
+            if systemctl --user is-active csm-flatpak-watcher.service >/dev/null 2>&1
+                csm_ok "csm-flatpak-watcher.service is active"
+            else
+                csm_warn "csm-flatpak-watcher.service is not running"
+            end
+        else
+            csm_warn "csm-flatpak-watcher.service is not enabled"
+        end
+    end
+
     echo ""
 end
 
@@ -131,8 +168,6 @@ end
 # ------------------------------------------------------------
 
 function csm_main
-    set -l argv_copy $argv
-
     if test (count $argv) -eq 0
         csm_usage
         return 0
@@ -150,7 +185,25 @@ function csm_main
             csm_cmd_status
         case doctor
             csm_cmd_doctor
-        case flatpak pacman paru cache
+        case flatpak
+            set -l sub ""
+            if test (count $rest) -gt 0
+                set sub $rest[1]
+            end
+            switch "$sub"
+                case "" help -h --help
+                    csm_flatpak $rest
+                case "status" "--status"
+                    # Status works even without config (degraded mode)
+                    if test -f (csm_config_path)
+                        csm_load_config
+                    end
+                    csm_flatpak $rest
+                case '*'
+                    csm_load_config; or return 1
+                    csm_flatpak $rest
+            end
+        case pacman paru cache
             csm_error "Module '$cmd' is not implemented yet."
             echo ""
             echo "Planned for a future version. See 'csm help'."
