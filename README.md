@@ -14,7 +14,7 @@ Module | Handles | Status
 ---|---|---
 `flatpak` | `~/.var/app`, `/var/lib/flatpak` | ✅ v0.2.0
 `paru` | `~/.cache/paru/clone` | ✅ v0.3.0
-`pacman` | `/var/cache/pacman/pkg` | 🔜 planned
+`pacman` | `/var/cache/pacman/pkg` | ✅ v0.6.1
 `cache` | `~/.cache` (whitelist + blacklist) | 🔜 planned
 
 ## Requirements
@@ -80,6 +80,13 @@ placeholder. See the tutorial for moving it manually.
     csm paru status              Show symlink state and disk usage
     csm paru migrate             Move ~/.cache/paru/clone to target and symlink
     csm paru revert              Undo migration (for uninstall)
+
+### Pacman module
+
+    csm pacman status            Show both caches + /etc/pacman.conf state
+    csm pacman migrate           Copy cache to target and add CacheDir
+    csm pacman cleanup-old       Delete old .pkg.tar.zst* from source
+    csm pacman revert            Remove CacheDir and optionally move data back
 
 ## Flatpak Watcher
 

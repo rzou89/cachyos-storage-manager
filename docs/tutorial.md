@@ -161,7 +161,100 @@ placeholder. Use `csm flatpak relocate-core` to move it.
 ```fish
 csm flatpak relocate-core --dry-run \
     "/mnt/NewDrive/CachyOS Storage Data Migration/Flatpak/Flatpak Core"
-    
+
+## 5c. Moving the pacman cache
+
+> **Prerequisite:** `csm setup` must have been run and a target drive
+> configured. Pacman cache is handled differently from Flatpak and Paru:
+> no symlinks for the data itself, no bind mounts. Instead, a second
+> `CacheDir` entry is added to `/etc/pacman.conf`.
+
+### Check current state
+
+```fish
+csm pacman status
+```
+
+### Migrate
+
+```fish
+csm pacman migrate
+```
+
+You will be prompted for your sudo password once. Type `y` at the
+confirmation prompt. The migration does **not** delete any files from
+the source — it only copies and configures.
+
+What happens:
+
+1. Validates target (absolute path, mounted)
+2. Aborts if any `pacman`/`paru`/`yay` is running
+3. Backs up `/etc/pacman.conf` with a timestamp
+4. Creates a symlink `$CSM_TARGET/csm` → `$CSM_ROOT` (path without spaces)
+5. Copies all packages with `rsync`
+6. Verifies file count
+7. Adds two `CacheDir` lines to `/etc/pacman.conf`
+8. Prints a test tutorial
+
+### Test before cleaning up
+
+After migrate, **do not** delete the old cache yet. Test first:
+
+```fish
+# Update the package database
+sudo pacman -Sy
+
+# Install a small package
+sudo pacman -S cowsay
+
+# Confirm the package landed in the target cache
+ls "/mnt/DataCachyOS/csm/pacman/pkg/" | grep cowsay
+```
+
+If the file appears in the target, everything works.
+
+### Clean up old cache
+
+Once you are confident:
+
+```fish
+csm pacman cleanup-old
+```
+
+Type `HAPUS` (all caps) to confirm. Only files matching
+`*.pkg.tar.zst*` are deleted. Other files are left untouched.
+
+### Revert
+
+```fish
+csm pacman revert
+```
+
+This removes the CSM `CacheDir` lines and the `csm` symlink. It asks
+whether to move the data back to `/var/cache/pacman/pkg/`.
+
+### How it works (important)
+
+Pacman's `CacheDir` setting **does not support spaces** in paths — each
+space is treated as a list separator. Since `$CSM_ROOT` contains
+`CachyOS Storage Data Migration` (with spaces), CSM creates a symlink
+without spaces:
+
+```
+/mnt/DataCachyOS/csm  →  /mnt/DataCachyOS/CachyOS Storage Data Migration
+```
+
+And pacman.conf uses:
+
+```
+CacheDir = /mnt/DataCachyOS/csm/pacman/pkg/
+CacheDir = /var/cache/pacman/pkg/
+```
+
+The **second** line is a fallback: if the target drive is not mounted,
+pacman automatically uses `/var/cache/pacman/pkg/` and everything keeps
+working.
+
 ## 6. Editing the config
 
 ```fish
