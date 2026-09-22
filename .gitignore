@@ -24,5 +24,6 @@ __pycache__/
 # Logs
 *.log
 # Local helper scripts
-apply-v0.2.0.sh
+apply-v*.sh
 fix-*.sh
+*.patch
