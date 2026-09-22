@@ -23,11 +23,16 @@ function __csm_paru_source_dir
 end
 
 function __csm_paru_clone_dir
-    if not set -q CSM_PARU_CLONE_DIR
-        echo "ERROR: CSM_PARU_CLONE_DIR is not configured." >&2
-        return 1
+    if set -q CSM_PARU_DIR
+        echo "$CSM_PARU_DIR"
+        return 0
     end
-    echo "$CSM_PARU_CLONE_DIR"
+    if set -q CSM_PARU_CLONE_DIR
+        echo "$CSM_PARU_CLONE_DIR"
+        return 0
+    end
+    echo "ERROR: CSM_PARU_DIR is not configured." >&2
+    return 1
 end
 
 # Abort if the target drive is not mounted.
@@ -334,4 +339,71 @@ function csm_paru
             __csm_paru_help
             return 1
     end
+end
+
+# ------------------------------------------------------------
+# Relocate support (used by 'csm relocate')
+# ------------------------------------------------------------
+
+function csm_paru_info
+    set -l source "$HOME/.cache/paru/clone"
+    set -l target ""
+    if set -q CSM_PARU_DIR
+        set target "$CSM_PARU_DIR"
+    else if set -q CSM_PARU_CLONE_DIR
+        set target "$CSM_PARU_CLONE_DIR"
+    end
+    echo "paru|$source|$target"
+end
+
+function csm_paru_relocate
+    set -l old_target "$argv[1]"
+    set -l new_target "$argv[2]"
+    set -l source "$HOME/.cache/paru/clone"
+
+    if test -z "$old_target"; or test -z "$new_target"
+        echo "  ERROR: relocate requires old and new targets"
+        return 1
+    end
+
+    if test "$old_target" = "$new_target"
+        echo "  SKIP: target unchanged"
+        return 0
+    end
+
+    mkdir -p "$new_target"
+
+    if test -d "$old_target"
+        for entry in "$old_target"/* "$old_target"/.*
+            set -l name (basename "$entry")
+            if test "$name" = "."; or test "$name" = ".."
+                continue
+            end
+            if not test -e "$entry"; and not test -L "$entry"
+                continue
+            end
+            set -l dest "$new_target/$name"
+            if test -e "$dest"; or test -L "$dest"
+                echo "  WARN: destination already exists: $name"
+                continue
+            end
+            mv "$entry" "$dest"
+            if test $status -eq 0
+                echo "  moved: $name"
+            else
+                echo "  ERROR: failed to move: $name"
+            end
+        end
+    end
+
+    if test -L "$source"
+        set -l current (readlink "$source")
+        if test "$current" = "$old_target"
+            rm "$source"
+            ln -s "$new_target" "$source"
+            echo "  relinked: $source -> $new_target"
+        end
+    end
+
+    return 0
 end

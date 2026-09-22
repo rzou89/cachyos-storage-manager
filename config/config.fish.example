@@ -1,20 +1,25 @@
 # ============================================================
-# CachyOS Storage Manager - Configuration
+# CachyOS Storage Manager - Configuration Example
 #
 # Copy this file to:
 #   ~/.config/cachyos-storage-manager/config.fish
 #
-# Then edit the paths below to match your system.
+# Or simply run:
+#   csm setup
+#
+# which generates this file interactively.
 # ============================================================
 
 # ------------------------------------------------------------
 # Global
 # ------------------------------------------------------------
 
-# Base directory on the target drive where everything is stored.
-# Must be on a different filesystem than your root drive.
-# Must be an absolute path.
+# Drive where all CSM-managed data will live.
+# Must be an absolute path, on a separate filesystem from /.
 set -g CSM_TARGET "/mnt/DataCachyOS"
+
+# Base folder for everything CSM manages on the target drive.
+set -g CSM_ROOT "$CSM_TARGET/CachyOS Storage Data Migration"
 
 # Create a backup before migrating? (1 = yes, 0 = no)
 set -g CSM_BACKUP_BEFORE_MIGRATE 1
@@ -23,34 +28,35 @@ set -g CSM_BACKUP_BEFORE_MIGRATE 1
 # Flatpak
 # ------------------------------------------------------------
 
-# Directory where Flatpak application user data is stored.
-set -g CSM_FLATPAK_DATA_DIR "$CSM_TARGET/Flatpak Data"
+# Where Flatpak application user data is stored.
+set -g CSM_FLATPAK_DIR "$CSM_ROOT/flatpak"
 
 # Name of the custom Flatpak installation.
+# Find yours with: flatpak --installations
 set -g CSM_FLATPAK_INSTALLATION "datacachyos"
 
 # Enable the Flatpak data watcher? (1 = yes, 0 = no)
 set -g CSM_FLATPAK_WATCH 1
 
 # ------------------------------------------------------------
-# Pacman
-# ------------------------------------------------------------
-
-# Directory where pacman package cache is stored.
-set -g CSM_PACMAN_CACHE_DIR "$CSM_TARGET/pacman/pkg"
-
-# ------------------------------------------------------------
 # Paru
 # ------------------------------------------------------------
 
-# Directory where paru clones AUR repositories.
-set -g CSM_PARU_CLONE_DIR "$CSM_TARGET/paru/clone"
+# Where paru clones AUR repositories.
+# Will be symlinked from ~/.cache/paru/clone.
+set -g CSM_PARU_DIR "$CSM_ROOT/paru"
 
 # ------------------------------------------------------------
-# User Cache (reserved for future version, not used yet)
+# Pacman (reserved, not used yet)
 # ------------------------------------------------------------
 
-set -g CSM_CACHE_TARGET "$CSM_TARGET/cache"
+set -g CSM_PACMAN_DIR "$CSM_ROOT/pacman"
+
+# ------------------------------------------------------------
+# User Cache (reserved, not used yet)
+# ------------------------------------------------------------
+
+set -g CSM_CACHE_DIR "$CSM_ROOT/data cache"
 
 # Folders under ~/.cache to migrate.
 set -g CSM_CACHE_MIGRATE paru yay thumbnails mozilla chromium \

@@ -21,6 +21,7 @@ source "$MODULES_DIR/common.fish"
 # Load modules
 source "$MODULES_DIR/flatpak.fish"
 source "$MODULES_DIR/paru.fish"
+source "$MODULES_DIR/init.fish"
 
 # ------------------------------------------------------------
 # Bantuan
@@ -34,6 +35,9 @@ function csm_usage
     echo "  csm <command>"
     echo ""
     echo "Commands:"
+    echo "  csm setup           First-time setup wizard"
+    echo "  csm relocate <path> Move all data to a new target drive"
+    echo "  csm edit [action]   Show/open/validate config"
     echo "  csm status          Show overall status"
     echo "  csm doctor          Check system health"
     echo "  csm version         Show version"
@@ -93,10 +97,22 @@ function csm_cmd_status
             end
 
             echo ""
-            echo "Flatpak"
-            if set -q CSM_FLATPAK_DATA_DIR
-                echo "  Data dir       : $CSM_FLATPAK_DATA_DIR"
+            echo "Paths"
+            if set -q CSM_ROOT
+                echo "  CSM_ROOT       : $CSM_ROOT"
             end
+            if set -q CSM_FLATPAK_DIR
+                echo "  Flatpak dir    : $CSM_FLATPAK_DIR"
+            else if set -q CSM_FLATPAK_DATA_DIR
+                echo "  Flatpak dir    : $CSM_FLATPAK_DATA_DIR"
+            end
+            if set -q CSM_PARU_DIR
+                echo "  Paru dir       : $CSM_PARU_DIR"
+            else if set -q CSM_PARU_CLONE_DIR
+                echo "  Paru dir       : $CSM_PARU_CLONE_DIR"
+            end
+            echo ""
+            echo "Flatpak"
             if set -q CSM_FLATPAK_INSTALLATION
                 echo "  Installation   : $CSM_FLATPAK_INSTALLATION"
             end
@@ -186,6 +202,12 @@ function csm_main
             csm_cmd_status
         case doctor
             csm_cmd_doctor
+        case setup
+            csm_setup
+        case relocate
+            csm_relocate $rest
+        case edit
+            csm_edit $rest
         case flatpak
             set -l sub ""
             if test (count $rest) -gt 0

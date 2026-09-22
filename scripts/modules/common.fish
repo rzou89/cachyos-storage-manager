@@ -135,6 +135,8 @@ function csm_load_config
         return 1
     end
 
+    csm_normalize_config
+
     return 0
 end
 
@@ -179,6 +181,69 @@ end
 # Versi
 # ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# Config compatibility
+# ------------------------------------------------------------
+
+# Migrate old config variable names to new ones (in-memory only).
+# New : CSM_ROOT, CSM_FLATPAK_DIR, CSM_PARU_DIR, CSM_PACMAN_DIR, CSM_CACHE_DIR
+# Old : CSM_FLATPAK_DATA_DIR, CSM_PARU_CLONE_DIR, CSM_PACMAN_CACHE_DIR, CSM_CACHE_TARGET
+function csm_normalize_config
+
+    if not set -q CSM_ROOT
+        if set -q CSM_TARGET
+            set -g CSM_ROOT "$CSM_TARGET/CachyOS Storage Data Migration"
+        end
+    end
+
+    if not set -q CSM_FLATPAK_DIR
+        if set -q CSM_FLATPAK_DATA_DIR
+            set -g CSM_FLATPAK_DIR "$CSM_FLATPAK_DATA_DIR"
+        else if set -q CSM_ROOT
+            set -g CSM_FLATPAK_DIR "$CSM_ROOT/flatpak"
+        end
+    end
+
+    if not set -q CSM_PARU_DIR
+        if set -q CSM_PARU_CLONE_DIR
+            set -g CSM_PARU_DIR "$CSM_PARU_CLONE_DIR"
+        else if set -q CSM_ROOT
+            set -g CSM_PARU_DIR "$CSM_ROOT/paru"
+        end
+    end
+
+    if not set -q CSM_PACMAN_DIR
+        if set -q CSM_PACMAN_CACHE_DIR
+            set -g CSM_PACMAN_DIR "$CSM_PACMAN_CACHE_DIR"
+        else if set -q CSM_ROOT
+            set -g CSM_PACMAN_DIR "$CSM_ROOT/pacman"
+        end
+    end
+
+    if not set -q CSM_CACHE_DIR
+        if set -q CSM_CACHE_TARGET
+            set -g CSM_CACHE_DIR "$CSM_CACHE_TARGET"
+        else if set -q CSM_ROOT
+            set -g CSM_CACHE_DIR "$CSM_ROOT/data cache"
+        end
+    end
+
+    return 0
+end
+
+# Backup the config file. Prints the backup path, or empty string.
+function csm_config_backup
+    set -l cfg (csm_config_path)
+    if not test -f "$cfg"
+        echo ""
+        return 0
+    end
+    set -l timestamp (date '+%Y%m%d-%H%M%S')
+    set -l backup "$cfg.bak.$timestamp"
+    cp "$cfg" "$backup"
+    echo "$backup"
+end
+
 function csm_version
-    echo "0.3.0"
+    echo "0.4.0"
 end

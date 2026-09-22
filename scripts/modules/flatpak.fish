@@ -26,11 +26,16 @@ function __csm_flatpak_core_dir
 end
 
 function __csm_flatpak_data_dir
-    if not set -q CSM_FLATPAK_DATA_DIR
-        echo "ERROR: CSM_FLATPAK_DATA_DIR is not configured." >&2
-        return 1
+    if set -q CSM_FLATPAK_DIR
+        echo "$CSM_FLATPAK_DIR"
+        return 0
     end
-    echo "$CSM_FLATPAK_DATA_DIR"
+    if set -q CSM_FLATPAK_DATA_DIR
+        echo "$CSM_FLATPAK_DATA_DIR"
+        return 0
+    end
+    echo "ERROR: CSM_FLATPAK_DIR is not configured." >&2
+    return 1
 end
 
 function __csm_flatpak_installation
@@ -589,4 +594,83 @@ function csm_flatpak
             __csm_flatpak_help
             return 1
     end
+end
+
+# ------------------------------------------------------------
+# Relocate support (used by 'csm relocate')
+# ------------------------------------------------------------
+
+# Report module state as a single pipe-delimited line.
+# Format: name|source_dir|target_dir
+function csm_flatpak_info
+    set -l source "$HOME/.var/app"
+    set -l target ""
+    if set -q CSM_FLATPAK_DIR
+        set target "$CSM_FLATPAK_DIR"
+    else if set -q CSM_FLATPAK_DATA_DIR
+        set target "$CSM_FLATPAK_DATA_DIR"
+    end
+    echo "flatpak|$source|$target"
+end
+
+# Move flatpak data from old_target to new_target and relink.
+# Args: <old_target> <new_target>
+function csm_flatpak_relocate
+    set -l old_target "$argv[1]"
+    set -l new_target "$argv[2]"
+    set -l source "$HOME/.var/app"
+
+    if test -z "$old_target"; or test -z "$new_target"
+        echo "  ERROR: relocate requires old and new targets"
+        return 1
+    end
+
+    if test "$old_target" = "$new_target"
+        echo "  SKIP: target unchanged"
+        return 0
+    end
+
+    mkdir -p "$new_target"
+
+    # Move contents
+    if test -d "$old_target"
+        for entry in "$old_target"/* "$old_target"/.*
+            set -l name (basename "$entry")
+            if test "$name" = "."; or test "$name" = ".."
+                continue
+            end
+            if not test -e "$entry"; and not test -L "$entry"
+                continue
+            end
+            set -l dest "$new_target/$name"
+            if test -e "$dest"; or test -L "$dest"
+                echo "  WARN: destination already exists: $name"
+                continue
+            end
+            mv "$entry" "$dest"
+            if test $status -eq 0
+                echo "  moved: $name"
+            else
+                echo "  ERROR: failed to move: $name"
+            end
+        end
+    end
+
+    # Relink every per-app symlink that pointed into old_target
+    if test -d "$source"
+        for app_link in "$source"/*
+            if not test -L "$app_link"
+                continue
+            end
+            set -l app_id (basename "$app_link")
+            set -l current (readlink "$app_link")
+            if string match -q "$old_target/*" "$current"
+                rm "$app_link"
+                ln -s "$new_target/$app_id" "$app_link"
+                echo "  relinked: $app_id"
+            end
+        end
+    end
+
+    return 0
 end
