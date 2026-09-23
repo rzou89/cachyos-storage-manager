@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-23
+
+### Fixed
+- Renamed default migration directory to 'CachyOS-Storage-Data-Migration' to eliminate spaces in paths.
+- Fixed Pacman module compatibility with pacman.conf CacheDir parsing without requiring helper symlinks.
+
+## [0.6.0] - 2026-09-23
+
+### Added
+- Added pacman module for migrating system package cache (/var/cache/pacman/pkg).
+
+## [0.5.0] - 2026-09-23
+
+### Changed
+- Refactored core modules and improved error handling during drive relocation.
+
 ## [0.4.1] - 2026-09-23
 
 ### Fixed
