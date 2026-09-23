@@ -119,7 +119,7 @@ function __csm_init_write_config
         echo "set -g CSM_TARGET \"$target\""
         echo ""
         echo "# Base folder for all CSM data on the target drive."
-        echo "set -g CSM_ROOT \"\$CSM_TARGET/CachyOS Storage Data Migration\""
+        echo "set -g CSM_ROOT \"\$CSM_TARGET/CachyOS-Storage-Data-Migration\""
         echo ""
         echo "# ------------------------------------------------------------"
         echo "# Flatpak"
@@ -174,6 +174,13 @@ end
 
 function csm_setup
 
+    # Auto-rename legacy directory with spaces if found
+    if test -d "$CSM_TARGET/CachyOS Storage Data Migration"
+        echo "Mendeteksi folder lama dengan spasi. Mengubah nama direktori..."
+        mv "$CSM_TARGET/CachyOS Storage Data Migration" "$CSM_TARGET/CachyOS-Storage-Data-Migration"
+    end
+
+
     csm_section "CachyOS Storage Manager - Setup"
 
     set -l cfg (csm_config_path)
@@ -206,7 +213,7 @@ function csm_setup
         return 1
     end
 
-    set -l root "$target/CachyOS Storage Data Migration"
+    set -l root "$target/CachyOS-Storage-Data-Migration"
 
     echo ""
     echo "Struktur folder yang akan dibuat:"
@@ -303,9 +310,9 @@ function csm_relocate
 
     set -l old_root "$CSM_ROOT"
     if test -z "$old_root"
-        set old_root "$old_drive/CachyOS Storage Data Migration"
+        set old_root "$old_drive/CachyOS-Storage-Data-Migration"
     end
-    set -l new_root "$new_drive/CachyOS Storage Data Migration"
+    set -l new_root "$new_drive/CachyOS-Storage-Data-Migration"
 
     set -l old_flatpak "$CSM_FLATPAK_DIR"
     set -l old_paru "$CSM_PARU_DIR"

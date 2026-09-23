@@ -44,7 +44,7 @@ Then run the interactive wizard:
 This will ask for the target drive and generate a proper config with the
 following structure on your target drive:
 
-    <target>/CachyOS Storage Data Migration/
+    <target>/CachyOS-Storage-Data-Migration/
       ├── Flatpak/
       │   ├── Flatpak Core/   (installation, see below)
       │   └── Flatpak Data/   (user data)
@@ -115,7 +115,7 @@ Edit with: `csm edit open`
 Variable | Default | Description
 ---|---|---
 `CSM_TARGET` | `/mnt/DataCachyOS` | Drive where CSM data lives.
-`CSM_ROOT` | `$CSM_TARGET/CachyOS Storage Data Migration` | Base folder on the target drive.
+`CSM_ROOT` | `$CSM_TARGET/CachyOS-Storage-Data-Migration` | Base folder on the target drive.
 `CSM_FLATPAK_DIR` | `$CSM_ROOT/Flatpak/Flatpak Data` | Flatpak user data location.
 `CSM_FLATPAK_CORE_DIR` | `$CSM_ROOT/Flatpak/Flatpak Core` | Flatpak installation path (reserved; `csm setup` only creates the folder).
 `CSM_FLATPAK_INSTALLATION` | `datacachyos` | Custom Flatpak installation name. Find with `flatpak --installations`.

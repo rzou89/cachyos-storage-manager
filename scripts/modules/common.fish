@@ -192,7 +192,7 @@ function csm_normalize_config
 
     if not set -q CSM_ROOT
         if set -q CSM_TARGET
-            set -g CSM_ROOT "$CSM_TARGET/CachyOS Storage Data Migration"
+            set -g CSM_ROOT "$CSM_TARGET/CachyOS-Storage-Data-Migration"
         end
     end
 
@@ -208,7 +208,7 @@ function csm_normalize_config
         if set -q CSM_ROOT
             set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/Flatpak/Flatpak Core"
         else if set -q CSM_TARGET
-            set -g CSM_FLATPAK_CORE_DIR "$CSM_TARGET/CachyOS Storage Data Migration/Flatpak/Flatpak Core"
+            set -g CSM_FLATPAK_CORE_DIR "$CSM_TARGET/CachyOS-Storage-Data-Migration/Flatpak/Flatpak Core"
         end
     end
 

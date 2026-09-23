@@ -19,7 +19,7 @@
 set -g CSM_TARGET "/mnt/DataCachyOS"
 
 # Base folder for everything CSM manages on the target drive.
-set -g CSM_ROOT "$CSM_TARGET/CachyOS Storage Data Migration"
+set -g CSM_ROOT "$CSM_TARGET/CachyOS-Storage-Data-Migration"
 
 # Create a backup before migrating? (1 = yes, 0 = no)
 set -g CSM_BACKUP_BEFORE_MIGRATE 1

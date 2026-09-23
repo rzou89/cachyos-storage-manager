@@ -58,7 +58,7 @@ function __csm_pacman_symlink_target
     if set -q CSM_ROOT
         echo "$CSM_ROOT"
     else if set -q CSM_TARGET
-        echo "$CSM_TARGET/CachyOS Storage Data Migration"
+        echo "$CSM_TARGET/CachyOS-Storage-Data-Migration"
     else
         echo ""
     end
@@ -108,7 +108,7 @@ end
 
 function __csm_pacman_is_configured
     # Match either the old (with spaces) or new (symlink) path
-    grep -qE "CacheDir = .*/csm/pacman/pkg|CacheDir = .*CachyOS Storage Data Migration/pacman" /etc/pacman.conf 2>/dev/null
+    grep -qE "CacheDir = .*/csm/pacman/pkg|CacheDir = .*CachyOS-Storage-Data-Migration/pacman" /etc/pacman.conf 2>/dev/null
 end
 
 function __csm_pacman_count_pkg
@@ -333,7 +333,7 @@ function csm_pacman_migrate
         echo 's = conf.read_text()'
         echo 'target = sys.argv[1]'
         echo 'marker = "#CacheDir    = /var/cache/pacman/pkg/"'
-        echo 'if "CachyOS Storage Data Migration/pacman" in s:'
+        echo 'if "CachyOS-Storage-Data-Migration/pacman" in s:'
         echo '    print("SKIP: already configured")'
         echo '    sys.exit(0)'
         echo 'if marker not in s:'

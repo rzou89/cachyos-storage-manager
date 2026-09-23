@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `config.fish.example` now reflects the folder layout used by `csm setup`:
-  `<target>/CachyOS Storage Data Migration/Flatpak/{Flatpak Core,Flatpak Data}/`
+  `<target>/CachyOS-Storage-Data-Migration/Flatpak/{Flatpak Core,Flatpak Data}/`
 
 ## [0.4.0] - 2026-09-23
 
@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `csm setup` — interactive first-time setup wizard
   - Validates the target drive (absolute, exists, mounted, writable)
-  - Creates the `CachyOS Storage Data Migration/` structure
+  - Creates the `CachyOS-Storage-Data-Migration/` structure
   - Generates a fresh config
   - Optionally migrates existing flatpak and paru data
   - Enables the Flatpak watcher service
@@ -53,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - New on-disk layout: all module data now lives under
-  `<target>/CachyOS Storage Data Migration/<module>/`
+  `<target>/CachyOS-Storage-Data-Migration/<module>/`
 - New primary config variables: `CSM_ROOT`, `CSM_FLATPAK_DIR`,
   `CSM_PARU_DIR`, `CSM_PACMAN_DIR`, `CSM_CACHE_DIR`
 - README rewritten to reflect the new commands and layout

@@ -98,7 +98,7 @@ function __csm_flatpak_core_help
     echo "  csm flatpak core-help                       Show this help"
     echo ""
     echo "<path> must be a full absolute path, e.g."
-    echo "  /mnt/NewDrive/CachyOS Storage Data Migration/Flatpak/Flatpak Core"
+    echo "  /mnt/NewDrive/CachyOS-Storage-Data-Migration/Flatpak/Flatpak Core"
     echo ""
     echo "Requires sudo. All running flatpak apps must be closed first."
 end

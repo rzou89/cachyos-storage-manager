@@ -23,8 +23,8 @@ use it.
 
 | Module | What it moves | Where it goes |
 |---|---|---|
-| flatpak | `~/.var/app` — Flatpak app data | `<target>/CachyOS Storage Data Migration/flatpak/` |
-| paru | `~/.cache/paru/clone` — AUR build dirs | `<target>/CachyOS Storage Data Migration/paru/` |
+| flatpak | `~/.var/app` — Flatpak app data | `<target>/CachyOS-Storage-Data-Migration/flatpak/` |
+| paru | `~/.cache/paru/clone` — AUR build dirs | `<target>/CachyOS-Storage-Data-Migration/paru/` |
 | pacman | `/var/cache/pacman/pkg` — package cache | planned |
 | cache | `~/.cache` (selected folders) | planned |
 
@@ -61,7 +61,7 @@ data to live. Example: `/mnt/DataCachyOS`.
 The wizard will:
 
 1. Check that the path is absolute, exists, is a separate filesystem, and is writable.
-2. Create a `CachyOS Storage Data Migration/` folder inside it, with subfolders `flatpak/`, `paru/`, `pacman/`, `data cache/`.
+2. Create a `CachyOS-Storage-Data-Migration/` folder inside it, with subfolders `flatpak/`, `paru/`, `pacman/`, `data cache/`.
 3. Write a config file to `~/.config/cachyos-storage-manager/config.fish`.
 4. Optionally migrate existing data (flatpak, paru) to the new location.
 5. Enable the flatpak watcher service.
@@ -138,7 +138,7 @@ What happens:
 
 > If you say "no" to the last question, your old data stays where it was.
 > Delete it manually once you are sure everything works:
-> `rm -rf "/mnt/OldDrive/CachyOS Storage Data Migration"`
+> `rm -rf "/mnt/OldDrive/CachyOS-Storage-Data-Migration"`
 
 ---
 
@@ -160,7 +160,7 @@ placeholder. Use `csm flatpak relocate-core` to move it.
 
 ```fish
 csm flatpak relocate-core --dry-run \
-    "/mnt/NewDrive/CachyOS Storage Data Migration/Flatpak/Flatpak Core"
+    "/mnt/NewDrive/CachyOS-Storage-Data-Migration/Flatpak/Flatpak Core"
 
 ## 5c. Moving the pacman cache
 
@@ -237,11 +237,11 @@ whether to move the data back to `/var/cache/pacman/pkg/`.
 
 Pacman's `CacheDir` setting **does not support spaces** in paths — each
 space is treated as a list separator. Since `$CSM_ROOT` contains
-`CachyOS Storage Data Migration` (with spaces), CSM creates a symlink
+`CachyOS-Storage-Data-Migration` (with spaces), CSM creates a symlink
 without spaces:
 
 ```
-/mnt/DataCachyOS/csm  →  /mnt/DataCachyOS/CachyOS Storage Data Migration
+/mnt/DataCachyOS/csm  →  /mnt/DataCachyOS/CachyOS-Storage-Data-Migration
 ```
 
 And pacman.conf uses:
