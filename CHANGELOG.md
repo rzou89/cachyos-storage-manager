@@ -33,3 +33,23 @@ Format ini berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### 🎉 Initial Baseline Release
 - Peluncuran versi dasar modul migrasi Steam, Flatpak watcher, dan pacman/paru cache.
+
+---
+
+## [0.7.0] - 2026-09-10
+- Integrasi modul Flatpak core watcher dan otomasi sinkronisasi background service.
+
+---
+
+## [0.6.1] - 2026-09-05
+- Perbaikan bug broken symlink pada cache pacman dan paru.
+
+---
+
+## [0.6.0] - 2026-09-01
+- Integrasi awal modul pengelolaan cache AUR (paru) dan pacman.
+
+---
+
+## [0.1.0] - [0.5.0] - 2026-08-01
+- Versi rilis eksperimental awal dan penentuan struktur direktori migrasi.
