@@ -30,12 +30,12 @@ set -g CSM_BACKUP_BEFORE_MIGRATE 1
 
 # Flatpak application data (user data: config, cache, savegames).
 # Symlinked from ~/.var/app/<app-id>.
-set -g CSM_FLATPAK_DIR "$CSM_ROOT/Flatpak/Flatpak Data"
+set -g CSM_FLATPAK_DIR "$CSM_ROOT/flatpak"
 
 # Flatpak core installation (application binaries, runtime, repo).
 # Registered with Flatpak via /etc/flatpak/installations.d/.
 # Change only if you have a custom Flatpak installation on the target drive.
-set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/Flatpak/Flatpak Core"
+set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/system"
 
 # Name of the custom Flatpak installation.
 # Find yours with: flatpak --installations

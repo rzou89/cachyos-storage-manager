@@ -206,7 +206,7 @@ function csm_normalize_config
 
     if not set -q CSM_FLATPAK_CORE_DIR
         if set -q CSM_ROOT
-            set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/Flatpak/Flatpak Core"
+            set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/system"
         else if set -q CSM_TARGET
             set -g CSM_FLATPAK_CORE_DIR "$CSM_TARGET/CachyOS-Storage-Data-Migration/Flatpak/Flatpak Core"
         end
@@ -216,7 +216,7 @@ function csm_normalize_config
         if set -q CSM_PARU_CLONE_DIR
             set -g CSM_PARU_DIR "$CSM_PARU_CLONE_DIR"
         else if set -q CSM_ROOT
-            set -g CSM_PARU_DIR "$CSM_ROOT/paru"
+            set -g CSM_PARU_DIR "$CSM_ROOT/cache/paru"
         end
     end
 
@@ -224,7 +224,7 @@ function csm_normalize_config
         if set -q CSM_PACMAN_CACHE_DIR
             set -g CSM_PACMAN_DIR "$CSM_PACMAN_CACHE_DIR"
         else if set -q CSM_ROOT
-            set -g CSM_PACMAN_DIR "$CSM_ROOT/pacman"
+            set -g CSM_PACMAN_DIR "$CSM_ROOT/cache/pacman"
         end
     end
 
@@ -314,7 +314,7 @@ function csm_sync_symlinks
     echo "========================================"
     echo ""
 
-    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/wine-prefixes"
+    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/apps/wine-prefixes"
     set -q CSM_SHADERCACHE_DIR; or set -gx CSM_SHADERCACHE_DIR "$CSM_ROOT/shader-cache"
     set -q CSM_CACHE_DIR; or set -gx CSM_CACHE_DIR "$CSM_ROOT/cache"
 

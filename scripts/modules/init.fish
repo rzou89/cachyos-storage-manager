@@ -125,8 +125,8 @@ function __csm_init_write_config
         echo "# Flatpak"
         echo "# ------------------------------------------------------------"
         echo ""
-        echo "set -g CSM_FLATPAK_DIR \"\$CSM_ROOT/Flatpak/Flatpak Data\""
-        echo "set -g CSM_FLATPAK_CORE_DIR \"\$CSM_ROOT/Flatpak/Flatpak Core\""
+        echo "set -g CSM_FLATPAK_DIR \"\$CSM_ROOT/flatpak\""
+        echo "set -g CSM_FLATPAK_CORE_DIR \"\$CSM_ROOT/flatpak/system\""
         echo "set -g CSM_FLATPAK_INSTALLATION \"$installation\""
         echo "set -g CSM_FLATPAK_WATCH $watch"
         echo ""
@@ -230,8 +230,8 @@ function csm_setup
         return 1
     end
 
-    mkdir -p "$root/Flatpak/Flatpak Core" \
-             "$root/Flatpak/Flatpak Data" \
+    mkdir -p "$root/flatpak/system" \
+             "$root/flatpak" \
              "$root/paru" \
              "$root/pacman" \
              "$root/data cache"
@@ -316,8 +316,8 @@ function csm_relocate
 
     set -l old_flatpak "$CSM_FLATPAK_DIR"
     set -l old_paru "$CSM_PARU_DIR"
-    set -l new_flatpak "$new_root/Flatpak/Flatpak Data"
-    set -l new_flatpak_core "$new_root/Flatpak/Flatpak Core"
+    set -l new_flatpak "$new_root/flatpak"
+    set -l new_flatpak_core "$new_root/flatpak/system"
     set -l new_paru "$new_root/paru"
 
     echo ""
