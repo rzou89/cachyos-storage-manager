@@ -232,7 +232,7 @@ function csm_normalize_config
         if set -q CSM_CACHE_TARGET
             set -g CSM_CACHE_DIR "$CSM_CACHE_TARGET"
         else if set -q CSM_ROOT
-            set -g CSM_CACHE_DIR "$CSM_ROOT/data cache"
+            set -g CSM_CACHE_DIR "$CSM_ROOT/cache"
         end
     end
 
@@ -255,3 +255,8 @@ end
 function csm_version
     echo "0.6.1"
 end
+
+# Cache module configuration
+set -q CSM_CACHE_DIR; or set -gx CSM_CACHE_DIR "$CSM_ROOT/cache"
+set -q CSM_CACHE_WHITELIST; or set -gx CSM_CACHE_WHITELIST mozilla google-chrome chromium zen pip yarn npm go-build cargo thumbnails electron node-gyp clangd
+set -q CSM_CACHE_BLACKLIST; or set -gx CSM_CACHE_BLACKLIST fontconfig mesa_shader_cache nvidia pipewire wireplumber systemd dconf ksycoca5 plasmashell gnome-shell
