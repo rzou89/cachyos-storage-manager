@@ -198,17 +198,17 @@ function csm_normalize_config
 
     if not set -q CSM_FLATPAK_DIR
         if set -q CSM_FLATPAK_DATA_DIR
-            set -g CSM_FLATPAK_DIR "$CSM_FLATPAK_DATA_DIR"
+            set -gx CSM_FLATPAK_DIR "$CSM_FLATPAK_DATA_DIR"
         else if set -q CSM_ROOT
-            set -g CSM_FLATPAK_DIR "$CSM_ROOT/flatpak"
+            set -gx CSM_FLATPAK_DIR "$CSM_ROOT/flatpak"
         end
     end
 
     if not set -q CSM_FLATPAK_CORE_DIR
         if set -q CSM_ROOT
-            set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/system"
+            set -gx CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/system"
         else if set -q CSM_TARGET
-            set -g CSM_FLATPAK_CORE_DIR "$CSM_TARGET/CachyOS-Storage-Data-Migration/Flatpak/Flatpak Core"
+            set -gx CSM_FLATPAK_CORE_DIR "$CSM_TARGET/CachyOS-Storage-Data-Migration/Flatpak/Flatpak Core"
         end
     end
 
