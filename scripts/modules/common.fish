@@ -260,3 +260,47 @@ end
 set -q CSM_CACHE_DIR; or set -gx CSM_CACHE_DIR "$CSM_ROOT/cache"
 set -q CSM_CACHE_WHITELIST; or set -gx CSM_CACHE_WHITELIST mozilla google-chrome chromium zen pip yarn npm go-build cargo thumbnails electron node-gyp clangd
 set -q CSM_CACHE_BLACKLIST; or set -gx CSM_CACHE_BLACKLIST fontconfig mesa_shader_cache nvidia pipewire wireplumber systemd dconf ksycoca5 plasmashell gnome-shell
+
+function csm_doctor
+    csm_load_config; or return 1
+
+    echo "========================================"
+    echo " CachyOS Storage Manager - Doctor"
+    echo "========================================"
+    echo ""
+
+    set -l errors 0
+
+    if test -f "$HOME/.config/cachyos-storage-manager/config.fish"
+        echo "[OK] Config file exists."
+    else
+        echo "[ERROR] Config file missing!"
+        set errors (math $errors + 1)
+    end
+
+    if test -d "$CSM_ROOT"
+        echo "[OK] Target root directory exists ($CSM_ROOT)."
+    else
+        echo "[ERROR] Target root directory not found ($CSM_ROOT)!"
+        set errors (math $errors + 1)
+    end
+
+    if contains "$HOME/.local/bin" $PATH
+        echo "[OK] ~/.local/bin is in \$PATH."
+    else
+        echo "[WARNING] ~/.local/bin is not in \$PATH."
+    end
+
+    if systemctl --user is-active csm-flatpak-watcher.service >/dev/null 2>&1
+        echo "[OK] Flatpak watcher service is active."
+    else
+        echo "[INFO] Flatpak watcher service is inactive."
+    end
+
+    echo ""
+    if test $errors -eq 0
+        echo "System status: Healthy!"
+    else
+        echo "System status: $errors issue(s) detected."
+    end
+end
