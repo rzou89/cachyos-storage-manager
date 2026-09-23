@@ -28,3 +28,5 @@ apply-v*.sh
 v*-*.sh
 fix-*.sh
 *.patch
+*.py
+__pycache__/
