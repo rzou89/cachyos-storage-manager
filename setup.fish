@@ -5,6 +5,7 @@
 # ============================================================
 
 set -l APP_NAME "CachyOS Storage Manager"
+set -l MODULE_DIR "$HOME/.local/share/cachyos-storage-manager/modules"
 set -l INSTALL_DIR "$HOME/.local/bin"
 set -l SHARE_DIR "$HOME/.local/share/cachyos-storage-manager"
 set -l CONFIG_DIR "$HOME/.config/cachyos-storage-manager"
@@ -67,7 +68,15 @@ end
 
 mkdir -p "$SHARE_DIR/modules"
 
-cp "$SOURCE_MAIN" "$INSTALL_DIR/csm"
+mkdir -p "$MODULE_DIR"
+    cp "$PROJECT_DIR/scripts/csm.fish" "$MODULE_DIR/csm.fish"
+    echo "OK: module -> $MODULE_DIR/csm.fish"
+for mod in "$PROJECT_DIR/scripts/modules"/*.fish
+    cp "$mod" "$MODULE_DIR/"
+    echo "OK: module -> $MODULE_DIR/"(basename "$mod")
+end
+
+cp "$PROJECT_DIR/build/csm" "$INSTALL_DIR/csm"
 chmod +x "$INSTALL_DIR/csm"
 
 for module in "$SOURCE_MODULES"/*.fish

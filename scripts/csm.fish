@@ -1,100 +1,180 @@
-#!/usr/bin/env fish
+# File: scripts/csm.fish - Core interactive CLI and orchestration (v1.0.0)
 
-set -g CSM_VERSION "0.7.0"
-set -g CSM_SCRIPT_DIR (dirname (status filename))
-set -g CSM_MODULES_DIR "$CSM_SCRIPT_DIR/modules"
+function csm_interactive_setup
+    echo "========================================"
+    echo " CachyOS Storage Manager - Setup Wizard "
+    echo "========================================"
+    echo ""
 
-if not test -d "$CSM_MODULES_DIR"
-    set CSM_MODULES_DIR "$HOME/.local/share/cachyos-storage-manager/modules"
+    set -l target_dir ""
+    set -l config_file "$HOME/.config/cachyos-storage-manager/config.fish"
+
+    if test -f "$config_file"
+        source "$config_file" 2>/dev/null
+    end
+
+    if test -n "$CSM_ROOT"; and test -d "$CSM_ROOT"
+        echo "[INFO] Direktori target NVMe yang terkonfigurasi saat ini:"
+        echo "       $CSM_ROOT"
+        echo ""
+        echo "Pilih opsi direktori tujuan:"
+        echo "  [1] Gunakan folder yang sudah disetting sebelumnya (Default)"
+        echo "  [2] Pindahkan ke folder tujuan baru"
+        echo ""
+        read -P "Pilihan Anda [1/2] (ketik 1/Enter untuk lanjut, 2 untuk baru, q untuk batal): " opt_choice
+
+        if test "$opt_choice" = "q"; or test "$opt_choice" = "cancel"; or test "$opt_choice" = "exit"
+            echo "[CANCELLED] Proses wizard dibatalkan oleh pengguna."
+            return 0
+        else if test "$opt_choice" = "2"
+            read -P "Masukkan direktori tujuan NVMe baru secara lengkap (ketik q/Enter untuk batal): " input_path
+            if test -z "$input_path"; or test "$input_path" = "q"; or test "$input_path" = "cancel"; or test "$input_path" = "exit"
+                echo "[CANCELLED] Proses wizard dibatalkan oleh pengguna."
+                return 0
+            end
+            set target_dir "$input_path"
+        else
+            set target_dir "$CSM_ROOT"
+        end
+    else
+        echo "[INFO] Silakan tentukan direktori tujuan penyimpanan NVMe Anda secara eksplisit."
+        read -P "Masukkan direktori tujuan NVMe secara lengkap (ketik q atau tekan Enter untuk batal): " input_path
+        if test -z "$input_path"; or test "$input_path" = "q"; or test "$input_path" = "cancel"; or test "$input_path" = "exit"
+            echo "[CANCELLED] Proses wizard dibatalkan oleh pengguna."
+            return 0
+        end
+        set target_dir "$input_path"
+    end
+
+    set -g CSM_ROOT "$target_dir"
+    set -g CSM_TARGET "$target_dir"
+    set -g CSM_PARU_DIR "$target_dir/cache/paru"
+
+    mkdir -p "$HOME/.config/cachyos-storage-manager"
+    echo "# CachyOS Storage Manager Configuration" > "$config_file"
+    echo "set -g CSM_ROOT "$target_dir"" >> "$config_file"
+    echo "set -g CSM_TARGET "$target_dir"" >> "$config_file"
+    echo "set -g CSM_PARU_DIR "$target_dir/cache/paru"" >> "$config_file"
+
+    echo "[OK] Menggunakan direktori target: $CSM_ROOT"
+    echo ""
+
+    echo ">>> Memulai proses migrasi semua modul..."
+    if functions -q csm_cache_migrate; csm_cache_migrate; end
+    if functions -q csm_apps_migrate; csm_apps_migrate; end
+    if functions -q csm_system_migrate; csm_system_migrate; end
+    if functions -q csm_dev_migrate; csm_dev_migrate; end
+    if functions -q csm_steam_migrate; csm_steam_migrate; end
+    if functions -q csm_flatpak_migrate; csm_flatpak_migrate; end
+    if functions -q csm_pacman_migrate; csm_pacman_migrate; end
+    if functions -q csm_paru_migrate; csm_paru_migrate; end
+
+    echo ""
+    if functions -q csm_sync_symlinks
+        csm_sync_symlinks
+    end
+
+    echo ""
+    echo "========================================"
+    echo " Setup Wizard Selesai dengan Sukses! "
+    echo "========================================"
 end
 
-source $CSM_MODULES_DIR/common.fish
-source $CSM_MODULES_DIR/init.fish
-source $CSM_MODULES_DIR/flatpak-core.fish
-source $CSM_MODULES_DIR/flatpak.fish
-source $CSM_MODULES_DIR/pacman.fish
-source $CSM_MODULES_DIR/paru.fish
-source $CSM_MODULES_DIR/cache.fish
+function csm_usage
+    echo "CachyOS Storage Manager (CSM) v1.0.0"
+    echo "Usage: csm [setup|version|status|doctor|analyze|restore|steam|cache]"
+end
+
+function csm_doctor
+    echo "========================================"
+    echo " CachyOS Storage Manager - Doctor"
+    echo "========================================"
+    echo ""
+    if test -f "$HOME/.config/cachyos-storage-manager/config.fish"
+        echo "[OK] File konfigurasi ada."
+    else
+        echo "[WARN] File konfigurasi tidak ditemukan."
+    end
+
+    if set -q CSM_ROOT; and test -d "$CSM_ROOT"
+        echo "[OK] Direktori target NVMe ditemukan ($CSM_ROOT)."
+    else
+        echo "[WARN] Direktori target NVMe belum terkonfigurasi atau tidak valid."
+    end
+
+    if contains -- "$HOME/.local/bin" $PATH
+        echo "[OK] ~/.local/bin terdaftar di $PATH."
+    else
+        echo "[WARN] ~/.local/bin tidak ada di $PATH."
+    end
+
+    if systemctl --user is-active --quiet csm-flatpak-watcher.service
+        echo "[OK] Layanan Flatpak watcher aktif."
+    else
+        echo "[INFO] Layanan Flatpak watcher tidak aktif."
+    end
+
+    echo ""
+    echo "System status: Healthy!"
+end
+
+function csm_load_config
+    set -l config_file "$HOME/.config/cachyos-storage-manager/config.fish"
+    if test -f "$config_file"
+        source "$config_file" 2>/dev/null
+    end
+end
 
 function csm_main
+    csm_load_config
     if test (count $argv) -eq 0
-        csm_help
-        return 0
+        csm_interactive_setup
+        return
     end
 
-    switch $argv[1]
-        case version -v --version
-            echo "csm $CSM_VERSION"
-        case help -h --help
-            csm_help
-        case status
-            csm_status
+    set -l cmd $argv[1]
+    switch "$cmd"
+        case setup
+            csm_interactive_setup
+        case version
+            echo "CachyOS Storage Manager v1.0.0"
+        case status analyze info
+            if functions -q csm_analyze
+                csm_analyze
+            else
+                echo "Modul analisis belum dimuat."
+            end
         case doctor
             csm_doctor
-        case init
-            csm_init
-        case flatpak-core
-            switch $argv[2]
-                case migrate
-                    csm_flatpak_core_migrate
-                case revert
-                    csm_flatpak_core_revert
-                case status
-                    csm_flatpak_core_status
-                case '*'
-                    echo "Usage: csm flatpak-core {migrate|revert|status|watch}"
+        case restore
+            if functions -q csm_restore
+                csm_restore
+            else
+                echo "Modul restore belum dimuat."
             end
-        case flatpak
-            switch $argv[2]
-                case migrate
-                    csm_flatpak_migrate
-                case revert
-                    csm_flatpak_revert
-                case status
-                    csm_flatpak_status
-                case watch
-                    csm_flatpak_watch
-                case '*'
-                    echo "Usage: csm flatpak {migrate|revert|status|watch}"
-            end
-        case pacman
-            switch $argv[2]
-                case migrate
-                    csm_pacman_migrate
-                case revert
-                    csm_pacman_revert
-                case status
-                    csm_pacman_status
-                case '*'
-                    echo "Usage: csm pacman {migrate|revert|status|watch}"
+        case steam
+            if test (count $argv) -ge 2
+                set -l subfunc csm_steam_$argv[2]
+                if functions -q $subfunc
+                    $subfunc $argv[3..-1]
+                else
+                    echo "Usage: csm steam [migrate|status|clean-orphans]"
+                end
+            else
+                csm_steam_status
             end
         case cache
-            switch $argv[2]
-                case status
-                    csm_cache_status
-                case migrate
-                    csm_cache_migrate
-                case revert
-                    csm_cache_revert
-                case '*'
-                    echo "Usage: csm cache {status|migrate|revert}"
-            end
-        case paru
-            switch $argv[2]
-                case migrate
-                    csm_paru_migrate
-                case revert
-                    csm_paru_revert
-                case status
-                    csm_paru_status
-                case '*'
-                    echo "Usage: csm paru {migrate|revert|status|watch}"
+            if test (count $argv) -ge 2
+                set -l subfunc csm_cache_$argv[2]
+                if functions -q $subfunc
+                    $subfunc $argv[3..-1]
+                else
+                    echo "Usage: csm cache [migrate|status]"
+                end
+            else
+                csm_cache_status
             end
         case '*'
-            echo "Unknown command: $argv[1]"
-            echo "Run 'csm help' for available commands."
-            return 1
+            csm_usage
     end
 end
-
-csm_main $argv

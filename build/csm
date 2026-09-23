@@ -1,0 +1,13 @@
+#!/usr/bin/env fish
+set -l CSM_SHARE "$HOME/.local/share/cachyos-storage-manager"
+if test -d "$CSM_SHARE/modules"
+    for mod in "$CSM_SHARE/modules"/*.fish
+        source "$mod"
+    end
+end
+if functions -q csm_main
+    csm_main $argv
+else
+    echo "[ERROR] CSM core modules failed to load."
+    exit 1
+end

@@ -152,3 +152,13 @@ csm cache status    # Scan ~/.cache items, size, and classification
 csm cache migrate   # Safely migrate whitelisted cache items to target drive
 csm cache revert    # Restore migrated cache items back to ~/.cache
 ```
+
+### Steam & Gaming Module (`csm steam`)
+Manages Proton Wine prefixes (`compatdata`), Vulkan shader caches, and orphan prefixes from uninstalled games.
+
+```bash
+csm steam status           # Scan Steam compatdata & shadercache sizes and status
+csm steam migrate          # Migrate compatdata & shadercache to secondary drive
+csm steam revert           # Restore migrated Steam components back to main drive
+csm steam clean-orphans    # Scan for leftover Proton prefixes of uninstalled games
+```

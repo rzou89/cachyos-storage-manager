@@ -258,8 +258,8 @@ end
 
 # Cache module configuration
 set -q CSM_CACHE_DIR; or set -gx CSM_CACHE_DIR "$CSM_ROOT/cache"
-set -q CSM_CACHE_WHITELIST; or set -gx CSM_CACHE_WHITELIST mozilla google-chrome chromium zen pip yarn npm go-build cargo thumbnails electron node-gyp clangd
-set -q CSM_CACHE_BLACKLIST; or set -gx CSM_CACHE_BLACKLIST fontconfig mesa_shader_cache nvidia pipewire wireplumber systemd dconf ksycoca5 plasmashell gnome-shell
+set -q CSM_CACHE_WHITELIST mesa_shader_cache; or set -gx CSM_CACHE_WHITELIST mesa_shader_cache mozilla google-chrome chromium zen pip yarn npm go-build cargo thumbnails electron node-gyp clangd
+set -q CSM_CACHE_BLACKLIST; or set -gx CSM_CACHE_BLACKLIST fontconfig  nvidia pipewire wireplumber systemd dconf ksycoca5 plasmashell gnome-shell
 
 function csm_doctor
     csm_load_config; or return 1
@@ -286,9 +286,9 @@ function csm_doctor
     end
 
     if contains "$HOME/.local/bin" $PATH
-        echo "[OK] ~/.local/bin is in \$PATH."
+        echo "[OK] ~/.local/bin is in $PATH."
     else
-        echo "[WARNING] ~/.local/bin is not in \$PATH."
+        echo "[WARNING] ~/.local/bin is not in $PATH."
     end
 
     if systemctl --user is-active csm-flatpak-watcher.service >/dev/null 2>&1
@@ -303,4 +303,40 @@ function csm_doctor
     else
         echo "System status: $errors issue(s) detected."
     end
+end
+
+
+function csm_sync_symlinks
+    csm_load_config; or return 1
+
+    echo "========================================"
+    echo " Validating & Re-syncing Symlinks"
+    echo "========================================"
+    echo ""
+
+    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/wine-prefixes"
+    set -q CSM_SHADERCACHE_DIR; or set -gx CSM_SHADERCACHE_DIR "$CSM_ROOT/shader-cache"
+    set -q CSM_CACHE_DIR; or set -gx CSM_CACHE_DIR "$CSM_ROOT/cache"
+
+    set -l sync_targets         "$HOME/.local/share/Steam/steamapps/compatdata:$CSM_WINEPREFIX_DIR/steam-compatdata-native:Native Steam Compatdata"         "$HOME/.local/share/Steam/steamapps/shadercache:$CSM_SHADERCACHE_DIR/steam-shadercache-native:Native Steam Shadercache"         "$HOME/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/compatdata:$CSM_WINEPREFIX_DIR/steam-compatdata-flatpak:Flatpak Steam Compatdata"         "$HOME/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/shadercache:$CSM_SHADERCACHE_DIR/steam-shadercache-flatpak:Flatpak Steam Shadercache"
+
+    for entry in $sync_targets
+        set -l parts (string split ":" -- $entry)
+        set -l src $parts[1]
+        set -l dest $parts[2]
+        set -l label $parts[3]
+
+        # 1. Bersihkan broken symlink
+        if test -L "$src"; and not test -e "$src"
+            echo "[FIX] Cleaning broken symlink: $src"
+            rm -f "$src"
+        end
+
+        # 2. Re-sync jika folder target ada di NVMe sekunder tetapi symlink di home terputus
+        if test -d "$dest"; and not test -e "$src"; and not test -L "$src"
+            echo "[SYNC] Re-linking $label -> $dest"
+            ln -s "$dest" "$src"
+        end
+    end
+    echo "[OK] Symlinks validation & sync complete."
 end

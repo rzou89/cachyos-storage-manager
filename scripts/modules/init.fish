@@ -150,7 +150,7 @@ function __csm_init_write_config
         echo "set -g CSM_CACHE_MIGRATE paru yay thumbnails mozilla chromium \\"
         echo "    BraveSoftware spotify discord telegram Code JetBrains \\"
         echo "    pip npm yarn go-build"
-        echo "set -g CSM_CACHE_SKIP mesa_shader_cache mesa_shader_cache_db \\"
+        echo "set -g CSM_CACHE_SKIP  _db \\"
         echo "    fontconfig dconf ibus fcitx5"
         echo ""
         echo "# ------------------------------------------------------------"
