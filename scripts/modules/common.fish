@@ -253,7 +253,7 @@ function csm_config_backup
 end
 
 function csm_version
-    echo "0.6.1"
+    echo "0.7.0"
 end
 
 # Cache module configuration

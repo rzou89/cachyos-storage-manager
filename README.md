@@ -144,3 +144,11 @@ Older configs that still use `CSM_FLATPAK_DATA_DIR` or
 ## License
 
 MIT License — see LICENSE.
+### Cache Module (`csm cache`)
+Safe, granular cache management using Whitelist-First + Pre-flight safety checks.
+
+```bash
+csm cache status    # Scan ~/.cache items, size, and classification
+csm cache migrate   # Safely migrate whitelisted cache items to target drive
+csm cache revert    # Restore migrated cache items back to ~/.cache
+```

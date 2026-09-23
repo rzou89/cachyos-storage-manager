@@ -1,6 +1,6 @@
 #!/usr/bin/env fish
 
-set -g CSM_VERSION "0.6.1"
+set -g CSM_VERSION "0.7.0"
 set -g CSM_SCRIPT_DIR (dirname (status filename))
 set -g CSM_MODULES_DIR "$CSM_SCRIPT_DIR/modules"
 
