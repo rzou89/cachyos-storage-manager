@@ -1,6 +1,6 @@
 # CachyOS Storage Manager
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Shell](https://img.shields.io/badge/shell-fish-4aae47)
 
@@ -125,8 +125,8 @@ Variable | Default | Description
 `CSM_CACHE_DIR` | `$CSM_ROOT/data cache` | User cache target (reserved).
 `CSM_BACKUP_BEFORE_MIGRATE` | `1` | Create a backup before migrating.
 
-Older configs that still use `CSM_FLATPAK_DATA_DIR` or
-`CSM_PARU_CLONE_DIR` are automatically supported.
+Older configs that still use compatibility aliases like `CSM_FLATPAK_DATA_DIR`
+or `CSM_PARU_CLONE_DIR` are still accepted during normalization.
 
 ## Design Principles
 

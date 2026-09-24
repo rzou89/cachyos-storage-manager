@@ -87,7 +87,7 @@ function __csm_init_write_config
     set -l target "$argv[1]"
     set -l cfg (csm_config_path)
 
-    set -l installation "datacachyos"
+    set -l installation "default"
     if set -q CSM_FLATPAK_INSTALLATION
         set installation "$CSM_FLATPAK_INSTALLATION"
     end
@@ -125,8 +125,8 @@ function __csm_init_write_config
         echo "# Flatpak"
         echo "# ------------------------------------------------------------"
         echo ""
-        echo "set -g CSM_FLATPAK_DIR \"\$CSM_ROOT/flatpak\""
-        echo "set -g CSM_FLATPAK_CORE_DIR \"\$CSM_ROOT/flatpak/system\""
+        echo "set -g CSM_FLATPAK_DIR \"\$CSM_ROOT/flatpak/flatpak-data\""
+        echo "set -g CSM_FLATPAK_CORE_DIR \"\$CSM_ROOT/flatpak/flatpak-core/system\""
         echo "set -g CSM_FLATPAK_INSTALLATION \"$installation\""
         echo "set -g CSM_FLATPAK_WATCH $watch"
         echo ""
@@ -254,13 +254,23 @@ function csm_setup
 
     echo ""
     echo "Flatpak watcher service:"
+    set -l enable_watch 1
+    if set -q CSM_FLATPAK_WATCH
+        set enable_watch "$CSM_FLATPAK_WATCH"
+    end
+
     if command -sq systemctl
         systemctl --user daemon-reload 2>/dev/null
-        systemctl --user enable --now csm-flatpak-watcher.service 2>/dev/null
-        if test $status -eq 0
-            csm_ok "Watcher diaktifkan"
+        if test "$enable_watch" = "1"
+            systemctl --user enable --now csm-flatpak-watcher.service 2>/dev/null
+            if test $status -eq 0
+                csm_ok "Watcher diaktifkan"
+            else
+                csm_warn "Watcher tidak bisa diaktifkan (mungkin belum di-install via setup.fish)"
+            end
         else
-            csm_warn "Watcher tidak bisa diaktifkan (mungkin belum di-install via setup.fish)"
+            systemctl --user disable csm-flatpak-watcher.service 2>/dev/null
+            csm_warn "Watcher dinonaktifkan sesuai konfigurasi (CSM_FLATPAK_WATCH=$enable_watch)"
         end
     else
         csm_warn "systemctl tidak ada, watcher dilewati"

@@ -1,4 +1,4 @@
-# File: scripts/csm.fish - Core interactive CLI and orchestration (v1.0.0)
+# File: scripts/csm.fish - Core interactive CLI and orchestration (v1.1.0)
 
 function csm_interactive_setup
     echo "========================================"
@@ -81,8 +81,7 @@ function csm_interactive_setup
 end
 
 function csm_usage
-    echo "CachyOS Storage Manager (CSM) v1.0.0"
-    echo "Usage: csm [setup|version|status|doctor|analyze|restore|steam|cache]"
+    echo "Usage: csm [setup|version|status|doctor|analyze|restore|steam|flatpak|cache]"
 end
 
 function csm_doctor
@@ -123,6 +122,10 @@ function csm_load_config
     if test -f "$config_file"
         source "$config_file" 2>/dev/null
     end
+
+    if functions -q csm_normalize_config
+        csm_normalize_config
+    end
 end
 
 function csm_main
@@ -137,7 +140,7 @@ function csm_main
         case setup
             csm_interactive_setup
         case version
-            echo "CachyOS Storage Manager v1.0.0"
+            echo "CachyOS Storage Manager v1.1.0"
         case status analyze info
             if functions -q csm_analyze
                 csm_analyze
@@ -162,6 +165,32 @@ function csm_main
                 end
             else
                 csm_steam_status
+            end
+        case flatpak
+            if test (count $argv) -ge 2
+                switch "$argv[2]"
+                    case migrate status watch
+                        set -l subfunc csm_flatpak_$argv[2]
+                        if functions -q $subfunc
+                            $subfunc $argv[3..-1]
+                        else
+                            echo "Usage: csm flatpak [migrate|status|watch]"
+                        end
+                    case core-status
+                        csm_flatpak_core_status
+                    case relocate-core
+                        csm_flatpak_core_relocate $argv[3..-1]
+                    case core-help
+                        __csm_flatpak_core_help
+                    case migrate-core
+                        csm_flatpak_migrate_core $argv[3..-1]
+                    case cleanup
+                        csm_flatpak_cleanup
+                    case "*"
+                        echo "Usage: csm flatpak [migrate|status|watch|core-status|relocate-core|core-help|migrate-core|cleanup]"
+                end
+            else
+                csm_flatpak_status
             end
         case cache
             if test (count $argv) -ge 2

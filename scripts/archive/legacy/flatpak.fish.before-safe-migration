@@ -41,13 +41,9 @@ end
 function __csm_flatpak_installation
     if set -q CSM_FLATPAK_INSTALLATION
         echo "$CSM_FLATPAK_INSTALLATION"
-        return 0
+    else
+        echo "cachyos"
     end
-
-    # "default" is the default system-wide Flatpak installation.
-    # Flatpak documents --installation=default as equivalent to --system.
-    echo "default"
-    return 0
 end
 
 # Abort if the target drive is not mounted.
@@ -407,6 +403,12 @@ function csm_flatpak_status
         --columns=application,name,version
 
     echo ""
+    echo "=== $INSTALLATION Applications ==="
+    flatpak --installation="$INSTALLATION" list \
+        --app \
+        --columns=application,name,version
+
+    echo ""
     echo "=== Paths ==="
     echo "App data:"
     echo "  $DEST"
@@ -414,10 +416,9 @@ function csm_flatpak_status
     echo ""
     echo "=== Disk Usage ==="
 
-    set -l flatpak_core_path (realpath /var/lib/flatpak 2>/dev/null)
-
-    if test -n "$flatpak_core_path"; and test -d "$flatpak_core_path"
-        du -sh "$flatpak_core_path"
+    if test -d /var/lib/flatpak
+        sudo -n du -sh /var/lib/flatpak 2>/dev/null
+        or du -sh /var/lib/flatpak 2>/dev/null
     end
 
     if test -n "$DEST"; and test -d "$DEST"
@@ -462,8 +463,8 @@ function csm_flatpak_watch
     echo ""
 
     # Ensure config
-    if not set -q CSM_FLATPAK_DIR
-        echo "ERROR: CSM_FLATPAK_DIR is not configured."
+    if not set -q CSM_FLATPAK_DATA_DIR
+        echo "ERROR: CSM_FLATPAK_DATA_DIR is not configured."
         return 1
     end
 
@@ -526,12 +527,8 @@ function csm_flatpak_watch
         set event_source "$event_parts[1]"
         set event_name "$event_parts[2]"
 
-        set event_source (string trim -r -c '/' "$event_source")
-        set SOURCE_NORM (string trim -r -c '/' "$SOURCE")
-        set CORE_SOURCE_NORM (string trim -r -c '/' "$CORE_SOURCE")
-
         # Perubahan pada core Flatpak
-        if string match -q "$CORE_SOURCE_NORM/*" "$event_source"
+        if string match -q "$CORE_SOURCE/*" "$event_source"
             echo ""
             echo "Watcher detected Flatpak core change:"
             echo "  $event_name"
@@ -547,7 +544,7 @@ function csm_flatpak_watch
         end
 
         # Perubahan pada app-data
-        if test "$event_source" = "$SOURCE_NORM"
+        if test "$event_source" = "$SOURCE/"
             set app_id "$event_name"
             set app_dir "$SOURCE/$app_id"
         else

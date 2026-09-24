@@ -23,7 +23,7 @@ function csm_restore
     end
 
     echo "========================================"
-    echo "   CSM Rollback & Restore Tool (v1.0.0) "
+    echo "   CSM Rollback & Restore Tool (v1.1.0) "
     echo "========================================"
     read -P "Apakah Anda yakin ingin mengembalikan SELURUH data dari NVMe ke lokal ($HOME)? [y/N]: " confirm
     if not string match -ri '^y(es)?$' -- "$confirm"

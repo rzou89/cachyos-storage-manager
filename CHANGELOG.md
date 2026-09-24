@@ -6,6 +6,21 @@ Format ini berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [1.1.0] - 2026-09-25
+
+### Added
+- Penyempurnaan migrasi dan normalisasi konfigurasi untuk struktur direktori CSM v1.
+- Arsip legacy untuk referensi perubahan modul Flatpak.
+
+### Changed
+- Perbaikan alur pemuatan konfigurasi dan command utama `csm`.
+- Penyederhanaan modul pacman serta penyesuaian pengelolaan cache dan Flatpak.
+
+### Fixed
+- Perbaikan path target dan kompatibilitas konfigurasi antar modul.
+
+---
+
 ## [1.0.0] - 2026-09-23
 
 ### 🚀 Major Release & New Features

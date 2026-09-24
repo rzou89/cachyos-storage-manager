@@ -58,19 +58,44 @@ function csm_have
     command -sq $argv[1]
 end
 
-# Pastikan path adalah mount point / filesystem terpisah.
+# Pastikan path berada di filesystem yang sudah dipasang (mounted),
+# dan bukan sekadar subfolder di dalam root filesystem yang sama.
 # Argumen: <path>
 function csm_is_mounted
     set -l path $argv[1]
     if not test -d "$path"
         return 1
     end
-    # Bandingkan device id dengan parent
-    set -l dev_self (stat -c %d "$path" 2>/dev/null)
-    set -l dev_parent (stat -c %d (dirname "$path") 2>/dev/null)
-    if test "$dev_self" != "$dev_parent"
-        return 0
+
+    # Preferred check: ask the system directly which mountpoint owns this path.
+    if command -sq findmnt
+        set -l mount_target (findmnt -T "$path" -no TARGET 2>/dev/null | string trim)
+        if test -n "$mount_target"
+            if test "$mount_target" != "/"
+                return 0
+            end
+            return 1
+        end
     end
+
+    # Fallback: compare device ids until we hit the nearest mounted boundary.
+    set -l dev_self (stat -c %d "$path" 2>/dev/null)
+    set -l current "$path"
+
+    while test -n "$current"
+        set -l parent (dirname "$current")
+        if test "$parent" = "$current"
+            break
+        end
+
+        set -l dev_parent (stat -c %d "$parent" 2>/dev/null)
+        if test "$dev_self" != "$dev_parent"
+            return 0
+        end
+
+        set current "$parent"
+    end
+
     return 1
 end
 
@@ -186,8 +211,8 @@ end
 # ------------------------------------------------------------
 
 # Migrate old config variable names to new ones (in-memory only).
-# New : CSM_ROOT, CSM_FLATPAK_DIR, CSM_PARU_DIR, CSM_PACMAN_DIR, CSM_CACHE_DIR
-# Old : CSM_FLATPAK_DATA_DIR, CSM_PARU_CLONE_DIR, CSM_PACMAN_CACHE_DIR, CSM_CACHE_TARGET
+# Canonical keys used by active code: CSM_ROOT, CSM_FLATPAK_DIR, CSM_PARU_DIR,
+# CSM_PACMAN_DIR, CSM_CACHE_DIR. Older names are accepted as compatibility aliases.
 function csm_normalize_config
 
     if not set -q CSM_ROOT
@@ -200,15 +225,15 @@ function csm_normalize_config
         if set -q CSM_FLATPAK_DATA_DIR
             set -gx CSM_FLATPAK_DIR "$CSM_FLATPAK_DATA_DIR"
         else if set -q CSM_ROOT
-            set -gx CSM_FLATPAK_DIR "$CSM_ROOT/flatpak"
+            set -gx CSM_FLATPAK_DIR "$CSM_ROOT/flatpak/flatpak-data"
         end
     end
 
     if not set -q CSM_FLATPAK_CORE_DIR
         if set -q CSM_ROOT
-            set -gx CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/system"
+            set -gx CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/flatpak-core/system"
         else if set -q CSM_TARGET
-            set -gx CSM_FLATPAK_CORE_DIR "$CSM_TARGET/CachyOS-Storage-Data-Migration/Flatpak/Flatpak Core"
+            set -gx CSM_FLATPAK_CORE_DIR "$CSM_TARGET/CachyOS-Storage-Data-Migration/flatpak/flatpak-core/system"
         end
     end
 
@@ -253,7 +278,7 @@ function csm_config_backup
 end
 
 function csm_version
-    echo "1.0.0"
+    echo "1.1.0"
 end
 
 # Cache module configuration

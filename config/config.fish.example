@@ -19,6 +19,7 @@
 set -g CSM_TARGET "/mnt/DataCachyOS"
 
 # Base folder for everything CSM manages on the target drive.
+# Keep this aligned with scripts/modules/common.fish normalization.
 set -g CSM_ROOT "$CSM_TARGET/CachyOS-Storage-Data-Migration"
 
 # Create a backup before migrating? (1 = yes, 0 = no)
@@ -30,16 +31,12 @@ set -g CSM_BACKUP_BEFORE_MIGRATE 1
 
 # Flatpak application data (user data: config, cache, savegames).
 # Symlinked from ~/.var/app/<app-id>.
-set -g CSM_FLATPAK_DIR "$CSM_ROOT/flatpak"
+set -g CSM_FLATPAK_DIR "$CSM_ROOT/flatpak/flatpak-data"
 
-# Flatpak core installation (application binaries, runtime, repo).
-# Registered with Flatpak via /etc/flatpak/installations.d/.
-# Change only if you have a custom Flatpak installation on the target drive.
-set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/system"
+# Flatpak system core (applications, runtimes, OSTree repository, exports).
+# The active system installation is exposed through /var/lib/flatpak.
+set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/flatpak-core/system"
 
-# Name of the custom Flatpak installation.
-# Find yours with: flatpak --installations
-set -g CSM_FLATPAK_INSTALLATION "datacachyos"
 
 # Enable the Flatpak data watcher? (1 = yes, 0 = no)
 set -g CSM_FLATPAK_WATCH 1
