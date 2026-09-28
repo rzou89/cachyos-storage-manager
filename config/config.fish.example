@@ -47,19 +47,19 @@ set -g CSM_FLATPAK_WATCH 1
 
 # Where paru clones AUR repositories.
 # Will be symlinked from ~/.cache/paru/clone.
-set -g CSM_PARU_DIR "$CSM_ROOT/paru"
+set -g CSM_PARU_DIR "$CSM_ROOT/cache/paru"
 
 # ------------------------------------------------------------
-# Pacman (reserved, not used yet)
+# Pacman
 # ------------------------------------------------------------
 
-set -g CSM_PACMAN_DIR "$CSM_ROOT/pacman"
+set -g CSM_PACMAN_DIR "$CSM_ROOT/cache/pacman"
 
 # ------------------------------------------------------------
-# User Cache (reserved, not used yet)
+# User Cache
 # ------------------------------------------------------------
 
-set -g CSM_CACHE_DIR "$CSM_ROOT/data cache"
+set -g CSM_CACHE_DIR "$CSM_ROOT/cache"
 
 # Folders under ~/.cache to migrate.
 set -g CSM_CACHE_MIGRATE paru yay thumbnails mozilla chromium \
@@ -76,4 +76,5 @@ set -q CSM_CACHE_WHITELIST; or set -gx CSM_CACHE_WHITELIST mozilla google-chrome
 set -q CSM_CACHE_BLACKLIST; or set -gx CSM_CACHE_BLACKLIST fontconfig mesa_shader_cache nvidia pipewire wireplumber systemd dconf ksycoca5 plasmashell gnome-shell
 
 # Steam module configuration
-set -q CSM_STEAM_DIR; or set -gx CSM_STEAM_DIR "$CSM_ROOT/steam"
+set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/apps/wine-prefixes"
+set -q CSM_SHADERCACHE_DIR; or set -gx CSM_SHADERCACHE_DIR "$CSM_ROOT/shader-cache"

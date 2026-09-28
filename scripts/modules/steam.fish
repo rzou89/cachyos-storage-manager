@@ -8,7 +8,7 @@ function csm_steam_status
     echo "========================================"
     echo ""
 
-    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/wine-prefixes"
+    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/apps/wine-prefixes"
     set -q CSM_SHADERCACHE_DIR; or set -gx CSM_SHADERCACHE_DIR "$CSM_ROOT/shader-cache"
 
     echo "Wine Prefixes Target : $CSM_WINEPREFIX_DIR"
@@ -50,7 +50,7 @@ end
 function csm_steam_migrate
     csm_load_config; or return 1
 
-    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/wine-prefixes"
+    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/apps/wine-prefixes"
     set -q CSM_SHADERCACHE_DIR; or set -gx CSM_SHADERCACHE_DIR "$CSM_ROOT/shader-cache"
 
     mkdir -p "$CSM_WINEPREFIX_DIR" "$CSM_SHADERCACHE_DIR"
@@ -89,7 +89,7 @@ end
 function csm_steam_revert
     csm_load_config; or return 1
 
-    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/wine-prefixes"
+    set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/apps/wine-prefixes"
     set -q CSM_SHADERCACHE_DIR; or set -gx CSM_SHADERCACHE_DIR "$CSM_ROOT/shader-cache"
 
     echo "========================================"

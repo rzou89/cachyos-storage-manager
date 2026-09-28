@@ -1,4 +1,4 @@
-# File: scripts/csm.fish - Core interactive CLI and orchestration (v1.1.0)
+# File: scripts/csm.fish - Core interactive CLI and orchestration (v1.1.1)
 
 function csm_interactive_setup
     echo "========================================"
@@ -140,7 +140,7 @@ function csm_main
         case setup
             csm_interactive_setup
         case version
-            echo "CachyOS Storage Manager v1.1.0"
+            echo "CachyOS Storage Manager v1.1.1"
         case status analyze info
             if functions -q csm_analyze
                 csm_analyze

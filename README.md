@@ -1,6 +1,6 @@
 # CachyOS Storage Manager
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Shell](https://img.shields.io/badge/shell-fish-4aae47)
 
@@ -8,14 +8,14 @@ Unified storage manager for CachyOS and Arch Linux: move Flatpak data, pacman ca
 
 **New to CSM?** Read [docs/tutorial.md](docs/tutorial.md) first — it walks through first-time setup, daily use, and recovery.
 
-## Planned Modules
+## Modules
 
-Module | Handles | Status
+Module | What it manages | Commands
 ---|---|---
-`flatpak` | `~/.var/app`, `/var/lib/flatpak` | ✅ v0.2.0
-`paru` | `~/.cache/paru/clone` | ✅ v0.3.0
-`pacman` | `/var/cache/pacman/pkg` | ✅ v0.6.1
-`cache` | `~/.cache` (whitelist + blacklist) | 🔜 planned
+`flatpak` | Flatpak user data, system installation, and watcher | `csm flatpak ...`
+`steam` | Proton compatdata, shader caches, orphan prefixes | `csm steam ...`
+`cache` | Selected folders under `~/.cache` | `csm cache status`, `csm cache migrate`
+Setup migrations | App data, development tools, system data, paru, and pacman | `csm setup`
 
 ## Requirements
 
@@ -41,16 +41,19 @@ Then run the interactive wizard:
 
     csm setup
 
-This will ask for the target drive and generate a proper config with the
-following structure on your target drive:
+This configures a root folder on the target drive. Active modules create their
+data under the following shared layout as needed:
 
     <target>/CachyOS-Storage-Data-Migration/
-      ├── Flatpak/
-      │   ├── Flatpak Core/   (installation, see below)
-      │   └── Flatpak Data/   (user data)
-      ├── paru/
-      ├── pacman/             (reserved)
-      └── data cache/         (reserved)
+    ├── apps/               (launchers and Wine prefixes)
+    ├── cache/              (user, paru, and pacman caches)
+    ├── dev/                (development tools and data)
+    ├── flatpak/            (user data and optional system installation)
+    ├── shader-cache/
+    └── system/
+
+Steam Wine prefixes use `apps/wine-prefixes` by default. Shader caches use
+`shader-cache/`.
 
 The Flatpak **core** (application binaries, runtime, repo) is a separate
 Flatpak installation, registered in `/etc/flatpak/installations.d/`.
@@ -60,12 +63,11 @@ placeholder. See the tutorial for moving it manually.
 ## Commands
 
     csm setup                    First-time setup wizard
-    csm relocate <path>          Move all data to a new target drive
-    csm edit [show|open|validate] Show, edit, or validate the config
     csm status                   Overall status
     csm doctor                   Check dependencies and service health
+    csm analyze                  Show storage usage by category
+    csm restore                  Restore supported data to the local drive
     csm version                  Show version
-    csm help                     Show help
 
 ### Flatpak module
 
@@ -74,19 +76,6 @@ placeholder. See the tutorial for moving it manually.
     csm flatpak migrate-core     Move /var/lib/flatpak apps to custom installation
     csm flatpak cleanup          Remove unused refs from default installation
     csm flatpak watch            Run the watcher in foreground
-
-### Paru module
-
-    csm paru status              Show symlink state and disk usage
-    csm paru migrate             Move ~/.cache/paru/clone to target and symlink
-    csm paru revert              Undo migration (for uninstall)
-
-### Pacman module
-
-    csm pacman status            Show both caches + /etc/pacman.conf state
-    csm pacman migrate           Copy cache to target and add CacheDir
-    csm pacman cleanup-old       Delete old .pkg.tar.zst* from source
-    csm pacman revert            Remove CacheDir and optionally move data back
 
 ## Flatpak Watcher
 
@@ -103,26 +92,26 @@ Check it:
     systemctl --user status csm-flatpak-watcher.service
     journalctl --user -u csm-flatpak-watcher.service -f
 
-`csm setup` will enable it automatically. When `csm relocate` runs, the
-watcher is stopped, the data is moved, the config is updated, and the
-watcher is restarted.
+`csm setup` enables it automatically when watching is enabled in the config.
 
 ## Configuration
 
 Config file: `~/.config/cachyos-storage-manager/config.fish`
-Edit with: `csm edit open`
+Open it directly with your preferred text editor.
 
 Variable | Default | Description
 ---|---|---
 `CSM_TARGET` | `/mnt/DataCachyOS` | Drive where CSM data lives.
 `CSM_ROOT` | `$CSM_TARGET/CachyOS-Storage-Data-Migration` | Base folder on the target drive.
-`CSM_FLATPAK_DIR` | `$CSM_ROOT/flatpak` | Flatpak user data location.
-`CSM_FLATPAK_CORE_DIR` | `$CSM_ROOT/flatpak/system` | Flatpak installation path (reserved; `csm setup` only creates the folder).
+`CSM_FLATPAK_DIR` | `$CSM_ROOT/flatpak/flatpak-data` | Flatpak user data location.
+`CSM_FLATPAK_CORE_DIR` | `$CSM_ROOT/flatpak/flatpak-core/system` | Flatpak system installation path.
 `CSM_FLATPAK_INSTALLATION` | `datacachyos` | Custom Flatpak installation name. Find with `flatpak --installations`.
 `CSM_FLATPAK_WATCH` | `1` | Enable the Flatpak watcher service.
-`CSM_PARU_DIR` | `$CSM_ROOT/paru` | Paru clone target (symlinked from `~/.cache/paru/clone`).
-`CSM_PACMAN_DIR` | `$CSM_ROOT/pacman` | Pacman cache location (reserved).
-`CSM_CACHE_DIR` | `$CSM_ROOT/data cache` | User cache target (reserved).
+`CSM_PARU_DIR` | `$CSM_ROOT/cache/paru` | Paru clone target (symlinked from `~/.cache/paru/clone`).
+`CSM_PACMAN_DIR` | `$CSM_ROOT/cache/pacman` | Pacman cache location.
+`CSM_CACHE_DIR` | `$CSM_ROOT/cache` | User cache target.
+`CSM_WINEPREFIX_DIR` | `$CSM_ROOT/apps/wine-prefixes` | Steam Proton compatdata target.
+`CSM_SHADERCACHE_DIR` | `$CSM_ROOT/shader-cache` | Steam shader cache target.
 `CSM_BACKUP_BEFORE_MIGRATE` | `1` | Create a backup before migrating.
 
 Older configs that still use compatibility aliases like `CSM_FLATPAK_DATA_DIR`

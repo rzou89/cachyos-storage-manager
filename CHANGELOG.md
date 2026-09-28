@@ -6,6 +6,18 @@ Format ini berdasarkan [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [1.1.1] - 2026-09-28
+
+### Fixed
+- Selaraskan lokasi default prefix Wine Steam ke `$CSM_ROOT/apps/wine-prefixes` di modul Steam dan sinkronisasi symlink.
+- Selaraskan lokasi default `paru`, `pacman`, dan cache pada contoh konfigurasi dengan struktur `$CSM_ROOT/cache/`.
+- Samakan versi yang ditampilkan CLI dan modul restore dengan versi rilis.
+
+### Documentation
+- Perbarui README dan tutorial agar mencerminkan perintah CLI dan struktur folder yang aktif.
+
+---
+
 ## [1.1.0] - 2026-09-25
 
 ### Added
