@@ -264,6 +264,11 @@ function csm_setup
         set target "$input_path"
     end
 
+    # Path yang diketik (atau yang tersimpan di config lama) bisa saja sudah
+    # mengandung folder migrasi. Potong supaya struktur tidak bersarang:
+    # /mnt/DataCachyOS/<nama>/<nama> -> /mnt/DataCachyOS/<nama>
+    set target (csm_target_normalize "$target")
+
     # --- Validasi ---
     echo ""
     if not __csm_init_validate_drive "$target"

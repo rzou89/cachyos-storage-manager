@@ -22,6 +22,36 @@ function csm_root_name
     echo "CachyOS-Storage-Data-Migration"
 end
 
+# CSM_TARGET harus berupa drive / titik mount, BUKAN folder migrasinya.
+#
+# Config dari wizard versi lama ada yang menyimpan
+#   CSM_TARGET = /mnt/DataCachyOS/CachyOS-Storage-Data-Migration
+# sehingga CSM_ROOT (yang diturunkan sebagai $CSM_TARGET/<nama>) menjadi
+# bersarang dua kali: /mnt/DataCachyOS/<nama>/<nama>.
+#
+# Fungsi ini memotong segmen folder migrasi di ujung path apa pun yang
+# diberikan, sehingga nilai lama otomatis diperbaiki.
+# Argumen: <path>
+function csm_target_normalize
+    set -l path "$argv[1]"
+    set -l name (csm_root_name)
+
+    if test -z "$path"
+        echo ""
+        return 0
+    end
+
+    while test -n "$path"; and test "$path" != "/"
+        if test (basename "$path") = "$name"
+            set path (dirname "$path")
+            continue
+        end
+        break
+    end
+
+    echo "$path"
+end
+
 # ------------------------------------------------------------
 # Logging
 # ------------------------------------------------------------
@@ -188,16 +218,31 @@ end
 # Nama lama tetap diterima sebagai alias kompatibilitas.
 # Aman dipanggil berulang kali (idempotent).
 function csm_normalize_config
+    set -l root_name (csm_root_name)
+
+    # 1. CSM_TARGET harus berupa drive, bukan folder migrasinya.
+    #    Potong segmen <nama> di ujung path (bisa lebih dari satu kali).
+    if set -q CSM_TARGET; and test -n "$CSM_TARGET"
+        set -gx CSM_TARGET (csm_target_normalize "$CSM_TARGET")
+    end
+
+    # 2. Rapikan CSM_ROOT yang sudah telanjur bersarang: <drive>/<nama>/<nama>
+    if set -q CSM_ROOT; and test -n "$CSM_ROOT"
+        while test (basename "$CSM_ROOT") = "$root_name"
+            and test (basename (dirname "$CSM_ROOT")) = "$root_name"
+            set -gx CSM_ROOT (dirname "$CSM_ROOT")
+        end
+    end
 
     if not set -q CSM_ROOT; and set -q CSM_TARGET
-        set -gx CSM_ROOT "$CSM_TARGET/"(csm_root_name)
+        set -gx CSM_ROOT "$CSM_TARGET/"$root_name
     end
 
     # Perbaiki config dari wizard versi lama: CSM_ROOT pernah diset sama
     # dengan CSM_TARGET, sehingga seluruh data jatuh langsung di akar drive.
     if set -q CSM_ROOT; and set -q CSM_TARGET
         if test "$CSM_ROOT" = "$CSM_TARGET"
-            set -gx CSM_ROOT "$CSM_TARGET/"(csm_root_name)
+            set -gx CSM_ROOT "$CSM_TARGET/"$root_name
         end
     end
 
