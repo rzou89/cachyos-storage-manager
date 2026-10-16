@@ -1,54 +1,96 @@
-# Module: Rollback & Restore for CSM
+#!/usr/bin/env fish
 
+# ============================================================
+# CachyOS Storage Manager - Restore / rollback
+#
+# Mengembalikan SEMUA item yang dimigrasikan kembali ke lokasi aslinya
+# di $HOME. Dipakai sebelum uninstall, atau kalau drive target mau
+# dilepas.
+#
+# Catatan: ini hanya menyentuh item yang masih berupa symlink ke drive
+# target. Item yang tidak dimigrasikan tidak disentuh.
+# ============================================================
+
+# ------------------------------------------------------------
+# Internal helper
+# ------------------------------------------------------------
+
+# Wrapper tipis di atas csm_link_revert.
+# Argumen: <label> <src> <dest>
 function _csm_restore_app
-    set -l app_name $argv[1]
-    set -l src_path $argv[2]
-    set -l dest_path $argv[3]
-
-    if test -L "$src_path"
-        set -l target (readlink -f "$src_path")
-        if test "$target" = "$dest_path"; and test -d "$dest_path"
-            echo "-> Mengembalikan $app_name ke $src_path ..."
-            rm "$src_path"
-            mv "$dest_path" "$src_path"
-            echo "[OK] Berhasil dipulihkan: $app_name"
-        end
-    end
+    csm_link_revert "$argv[1]" "$argv[2]" "$argv[3]"
+    return $status
 end
 
+# ------------------------------------------------------------
+# Restore
+# ------------------------------------------------------------
+
 function csm_restore
-    if test -z "$CSM_ROOT"
-        echo "[ERROR] CSM_ROOT tidak terkonfigurasi."
-        return 1
+    csm_require_config; or return 1
+
+    csm_section "CSM Rollback & Restore"
+
+    echo "Target root: $CSM_ROOT"
+    echo ""
+    echo "Yang akan dikembalikan:"
+    echo ""
+
+    set -l pending
+    for item in (csm_managed_items)
+        set -l parts (string split "|" -- $item)
+        set -l label $parts[2]
+        set -l src   $parts[3]
+        set -l dest  $parts[4]
+
+        if test -L "$src"; and test (readlink "$src") = "$dest"
+            set pending $pending "$item"
+            printf "  %-28s %-10s <- %s\n" "$label" (csm_dir_size "$src") "$dest"
+        end
     end
 
-    echo "========================================"
-    echo "   CSM Rollback & Restore Tool (v1.1.1) "
-    echo "========================================"
-    read -P "Apakah Anda yakin ingin mengembalikan SELURUH data dari NVMe ke lokal ($HOME)? [y/N]: " confirm
-    if not string match -ri '^y(es)?$' -- "$confirm"
-        echo "[CANCELLED] Proses restore dibatalkan."
+    echo ""
+    if test (count $pending) -eq 0
+        csm_ok "Tidak ada item yang perlu dikembalikan."
+        echo ""
+        return 0
+    end
+
+    echo "Item di atas akan dipindah balik ke $HOME dan symlink-nya dihapus."
+    echo "Data di drive target hanya dibersihkan setelah terverifikasi."
+    echo ""
+    echo "Modul lain (cache, steam, pacman, paru, flatpak) punya perintah"
+    echo "revert sendiri dan TIDAK disentuh di sini."
+    echo ""
+
+    if not csm_confirm "Yakin ingin mengembalikan?" "N"
+        echo "[CANCELLED] Restore dibatalkan."
+        echo ""
         return 0
     end
 
     echo ""
-    echo ">>> Mengembalikan data ke direktori lokal..."
-    _csm_restore_app "Heroic Games Launcher" "$HOME/.config/heroic" "$CSM_ROOT/apps/heroic"
-    _csm_restore_app "UMU Proton Runtime" "$HOME/.local/share/umu" "$CSM_ROOT/apps/umu"
-    _csm_restore_app "Hydra Launcher Config" "$HOME/.config/hydralauncher" "$CSM_ROOT/apps/hydralauncher"
-    _csm_restore_app "Goverlay / MangoHud" "$HOME/.local/share/goverlay" "$CSM_ROOT/apps/goverlay"
-    _csm_restore_app "Lutris Config & Runners" "$HOME/.local/share/lutris" "$CSM_ROOT/apps/lutris"
-    _csm_restore_app "Desktop Icon Themes" "$HOME/.local/share/icons" "$CSM_ROOT/system/icons"
-    _csm_restore_app "VS Code - OSS Config" "$HOME/.config/Code - OSS" "$CSM_ROOT/dev/code-oss"
-    _csm_restore_app "VS Code Extensions" "$HOME/.vscode" "$CSM_ROOT/dev/vscode-extensions"
-    _csm_restore_app "Python UV Cache" "$HOME/.local/share/uv" "$CSM_ROOT/dev/uv"
-    _csm_restore_app "Python Pip Cache" "$HOME/.cache/pip" "$CSM_ROOT/cache/pip"
-    _csm_restore_app "Rust Cargo" "$HOME/.cargo" "$CSM_ROOT/dev/cargo"
-    _csm_restore_app "NPM Cache" "$HOME/.npm" "$CSM_ROOT/cache/npm"
-    _csm_restore_app "DXVK Shader Cache" "$HOME/.cache/dxvk" "$CSM_ROOT/shader-cache/dxvk"
+    set -l ok 0
+    set -l failed 0
+
+    for item in $pending
+        set -l parts (string split "|" -- $item)
+        set -l label $parts[2]
+        set -l src   $parts[3]
+        set -l dest  $parts[4]
+
+        _csm_restore_app "$label" "$src" "$dest"
+        if test $status -eq 0
+            set ok (math $ok + 1)
+        else
+            set failed (math $failed + 1)
+        end
+    end
 
     echo ""
-    echo "========================================"
-    echo " Proses Restore Selesai!"
-    echo "========================================"
+    csm_ok "Restore selesai: $ok dikembalikan, $failed gagal"
+    echo ""
+    echo "Periksa hasilnya:"
+    echo "  csm status"
+    echo ""
 end

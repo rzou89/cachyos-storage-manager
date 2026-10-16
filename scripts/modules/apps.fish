@@ -1,52 +1,125 @@
-# Module: Game Launchers & Apps Data Migration for CSM
+#!/usr/bin/env fish
 
+# ============================================================
+# CachyOS Storage Manager - Game launchers & app data
+#
+# Memindahkan folder data launcher game (Heroic, Lutris, ...) plus
+# shader cache DXVK ke drive target, lalu menggantinya dengan symlink.
+#
+# Dipanggil otomatis oleh 'csm setup'.
+# ============================================================
+
+# ------------------------------------------------------------
+# Internal helpers
+# ------------------------------------------------------------
+
+# Wrapper tipis di atas csm_link_migrate supaya laporan rapi.
+# Argumen: <label> <src> <dest>
 function _csm_migrate_app
-    set -l app_name $argv[1]
-    set -l src_path $argv[2]
-    set -l dest_path $argv[3]
-
-    if not test -e "$src_path"; and not test -L "$src_path"
-        return 0
-    end
-
-    if test -L "$src_path"
-        set -l current_target (readlink -f "$src_path")
-        if test "$current_target" = "$dest_path"
-            echo "[ALREADY MIGRATED] $app_name is already symlinked."
-            return 0
-        end
-    end
-
-    set -l parent_dir (dirname "$dest_path")
-    mkdir -p "$parent_dir"
-
-    if test -d "$src_path"; and not test -L "$src_path"
-        if not test -d "$dest_path"
-            echo "-> Moving $src_path to $dest_path ..."
-            mv "$src_path" "$dest_path"
-        else
-            echo "-> Merging $src_path into existing $dest_path ..."
-            cp -rP "$src_path/"* "$dest_path/" 2>/dev/null
-            rm -rf "$src_path"
-        end
-        ln -s "$dest_path" "$src_path"
-        echo "[OK] Successfully migrated: $app_name"
-    end
+    csm_link_migrate "$argv[1]" "$argv[2]" "$argv[3]"
+    return $status
 end
 
+# Jalankan migrasi untuk satu grup (= field 1 dari csm_managed_items).
+# Argumen: <grup> ...
+function __csm_group_migrate
+    set -l wanted $argv
+
+    set -l ok 0
+    set -l skipped 0
+    set -l failed 0
+
+    for item in (csm_managed_items)
+        set -l parts (string split "|" -- $item)
+        set -l group $parts[1]
+        set -l label $parts[2]
+        set -l src   $parts[3]
+        set -l dest  $parts[4]
+
+        if not contains -- "$group" $wanted
+            continue
+        end
+
+        _csm_migrate_app "$label" "$src" "$dest"
+        switch $status
+            case 0
+                set ok (math $ok + 1)
+            case 2
+                set skipped (math $skipped + 1)
+            case '*'
+                set failed (math $failed + 1)
+        end
+    end
+
+    echo ""
+    csm_ok "Selesai: $ok dimigrasikan, $skipped tidak ada, $failed gagal"
+    echo ""
+    return 0
+end
+
+# ------------------------------------------------------------
+# Migrate
+# ------------------------------------------------------------
+
 function csm_apps_migrate
-    if test -z "$CSM_ROOT"
+    if not set -q CSM_ROOT; or test -z "$CSM_ROOT"
+        csm_error "CSM_ROOT is not configured. Run 'csm setup'."
         return 1
     end
 
-    echo "========================================"
-    echo "  Migrating Game Launchers & App Data"
-    echo "========================================"
+    csm_section "Game Launchers & App Data Migration"
+    __csm_group_migrate apps shader
+end
 
-    _csm_migrate_app "Heroic Games Launcher" "$HOME/.config/heroic" "$CSM_ROOT/apps/heroic"
-    _csm_migrate_app "UMU Proton Runtime" "$HOME/.local/share/umu" "$CSM_ROOT/apps/umu"
-    _csm_migrate_app "Hydra Launcher Config" "$HOME/.config/hydralauncher" "$CSM_ROOT/apps/hydralauncher"
-    _csm_migrate_app "Goverlay / MangoHud" "$HOME/.local/share/goverlay" "$CSM_ROOT/apps/goverlay"
-    _csm_migrate_app "Lutris Config & Runners" "$HOME/.local/share/lutris" "$CSM_ROOT/apps/lutris"
-    _csm_migrate_app "DXVK Shader Cache" "$HOME/.cache/dxvk" "$CSM_ROOT/shader-cache/dxvk"
+# ------------------------------------------------------------
+# Status
+# ------------------------------------------------------------
+
+function csm_apps_status
+    if not set -q CSM_ROOT; or test -z "$CSM_ROOT"
+        csm_error "CSM_ROOT is not configured. Run 'csm setup'."
+        return 1
+    end
+
+    csm_section "Game Launchers & App Data Status"
+
+    for item in (csm_managed_items)
+        set -l parts (string split "|" -- $item)
+        set -l group $parts[1]
+        set -l label $parts[2]
+        set -l src   $parts[3]
+        set -l dest  $parts[4]
+
+        if not contains -- "$group" apps shader
+            continue
+        end
+
+        if not test -e "$src"; and not test -L "$src"
+            printf "%-28s %-10s %s\n" "$label" "-" "[NOT FOUND]"
+        else if test -L "$src"
+            if test (readlink "$src") = "$dest"
+                printf "%-28s %-10s %s\n" "$label" (csm_dir_size "$src") "[MIGRATED]"
+            else
+                printf "%-28s %-10s %s\n" "$label" (csm_dir_size "$src") "[OTHER LINK]"
+            end
+        else
+            printf "%-28s %-10s %s\n" "$label" (csm_dir_size "$src") "[LOCAL]"
+        end
+    end
+
+    echo ""
+end
+
+function csm_apps_help
+    echo "CachyOS Storage Manager - apps module"
+    echo ""
+    echo "Usage:"
+    echo "  csm apps status     Tampilkan status item launcher & shader"
+    echo "  csm apps migrate    Pindah item ke drive target"
+    echo ""
+    echo "Item yang dikelola: Heroic, UMU, Hydra, Goverlay, Lutris, DXVK cache."
+    echo "Modul ini juga dijalankan otomatis oleh 'csm setup'."
+    echo ""
+    echo "Untuk mengembalikan semua item (termasuk modul lain):"
+    echo "  csm restore"
 end

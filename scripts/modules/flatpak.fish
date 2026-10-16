@@ -397,14 +397,18 @@ function csm_flatpak_status
     echo "========================================"
     echo ""
 
-    echo "=== Installations ==="
-    flatpak --installations
+    if csm_have flatpak
+        echo "=== Installations ==="
+        flatpak --installations
 
-    echo ""
-    echo "=== Default System Applications ==="
-    flatpak --system list \
-        --app \
-        --columns=application,name,version
+        echo ""
+        echo "=== Default System Applications ==="
+        flatpak --system list \
+            --app \
+            --columns=application,name,version
+    else
+        csm_warn "flatpak tidak terinstall, daftar aplikasi dilewati."
+    end
 
     echo ""
     echo "=== Paths ==="
@@ -601,7 +605,7 @@ end
 # Help + dispatcher
 # ------------------------------------------------------------
 
-function __csm_flatpak_help
+function csm_flatpak_help
     echo "CachyOS Storage Manager - flatpak module"
     echo ""
     echo "Usage:"
@@ -637,12 +641,12 @@ function csm_flatpak
             csm_flatpak_watch
 
         case "help" "-h" "--help" ""
-            __csm_flatpak_help
+            csm_flatpak_help
 
         case "*"
             echo "ERROR: unknown flatpak subcommand: $argv[1]"
             echo ""
-            __csm_flatpak_help
+            csm_flatpak_help
             return 1
     end
 end

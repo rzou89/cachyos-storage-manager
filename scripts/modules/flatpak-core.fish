@@ -10,7 +10,7 @@
 # Public entry points (called from csm.fish):
 #   csm_flatpak_core_status
 #   csm_flatpak_core_relocate
-#   __csm_flatpak_core_help
+#   csm_flatpak_core_help
 # ============================================================
 
 # ------------------------------------------------------------
@@ -47,6 +47,10 @@ function __csm_flatpak_core_current_path
 end
 
 function __csm_flatpak_core_apps_count
+    if not csm_have flatpak
+        echo "?"
+        return 0
+    end
     set -l inst (__csm_flatpak_core_installation_name)
     flatpak --installation="$inst" list --columns=application 2>/dev/null \
         | wc -l | string trim
@@ -79,16 +83,18 @@ function csm_flatpak_core_status
     echo "Apps         : "(__csm_flatpak_core_apps_count)
     echo ""
 
-    echo "All flatpak installations:"
-    flatpak --installations
-    echo ""
+    if csm_have flatpak
+        echo "All flatpak installations:"
+        flatpak --installations
+        echo ""
+    end
 end
 
 # ------------------------------------------------------------
 # Help
 # ------------------------------------------------------------
 
-function __csm_flatpak_core_help
+function csm_flatpak_core_help
     echo "CachyOS Storage Manager - Flatpak core"
     echo ""
     echo "Usage:"
@@ -106,6 +112,13 @@ end
 # ------------------------------------------------------------
 # Relocate
 # ------------------------------------------------------------
+
+# Alias: dispatcher 'csm flatpak relocate-core' memetakan ke
+# csm_flatpak_relocate_core, jadi sediakan nama itu juga.
+function csm_flatpak_relocate_core
+    csm_flatpak_core_relocate $argv
+    return $status
+end
 
 function csm_flatpak_core_relocate
 

@@ -304,7 +304,7 @@ end
 # Help + dispatcher
 # ------------------------------------------------------------
 
-function __csm_paru_help
+function csm_paru_help
     echo "CachyOS Storage Manager - paru module"
     echo ""
     echo "Usage:"
@@ -331,12 +331,12 @@ function csm_paru
             csm_paru_revert
 
         case "help" "-h" "--help" ""
-            __csm_paru_help
+            csm_paru_help
 
         case "*"
             echo "ERROR: unknown paru subcommand: $argv[1]"
             echo ""
-            __csm_paru_help
+            csm_paru_help
             return 1
     end
 end

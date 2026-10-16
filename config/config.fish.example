@@ -8,6 +8,9 @@
 #   csm setup
 #
 # which generates this file interactively.
+#
+# Every variable below has a sane default computed from CSM_ROOT, so
+# you only strictly need CSM_TARGET. Unused sections can be deleted.
 # ============================================================
 
 # ------------------------------------------------------------
@@ -16,10 +19,11 @@
 
 # Drive where all CSM-managed data will live.
 # Must be an absolute path, on a separate filesystem from /.
+# Do NOT use spaces: pacman's CacheDir directive rejects them.
 set -g CSM_TARGET "/mnt/DataCachyOS"
 
 # Base folder for everything CSM manages on the target drive.
-# Keep this aligned with scripts/modules/common.fish normalization.
+# Defaults to $CSM_TARGET/CachyOS-Storage-Data-Migration.
 set -g CSM_ROOT "$CSM_TARGET/CachyOS-Storage-Data-Migration"
 
 # Create a backup before migrating? (1 = yes, 0 = no)
@@ -34,47 +38,53 @@ set -g CSM_BACKUP_BEFORE_MIGRATE 1
 set -g CSM_FLATPAK_DIR "$CSM_ROOT/flatpak/flatpak-data"
 
 # Flatpak system core (applications, runtimes, OSTree repository, exports).
-# The active system installation is exposed through /var/lib/flatpak.
+# Registered in /etc/flatpak/installations.d/.
 set -g CSM_FLATPAK_CORE_DIR "$CSM_ROOT/flatpak/flatpak-core/system"
 
+# Name of the Flatpak installation entry created by CSM.
+set -g CSM_FLATPAK_INSTALLATION "datacachyos"
 
-# Enable the Flatpak data watcher? (1 = yes, 0 = no)
+# Enable the Flatpak data watcher service? (1 = yes, 0 = no)
 set -g CSM_FLATPAK_WATCH 1
 
 # ------------------------------------------------------------
-# Paru
+# AUR & package caches
 # ------------------------------------------------------------
 
 # Where paru clones AUR repositories.
-# Will be symlinked from ~/.cache/paru/clone.
+# Symlinked from ~/.cache/paru/clone.
 set -g CSM_PARU_DIR "$CSM_ROOT/cache/paru"
 
-# ------------------------------------------------------------
-# Pacman
-# ------------------------------------------------------------
-
+# Pacman package cache on the target drive.
+# Registered as an extra CacheDir in /etc/pacman.conf.
 set -g CSM_PACMAN_DIR "$CSM_ROOT/cache/pacman"
 
 # ------------------------------------------------------------
-# User Cache
+# User cache
 # ------------------------------------------------------------
 
+# Base folder for migrated ~/.cache entries.
 set -g CSM_CACHE_DIR "$CSM_ROOT/cache"
 
-# Folders under ~/.cache to migrate.
-set -g CSM_CACHE_MIGRATE paru yay thumbnails mozilla chromium \
-    BraveSoftware spotify discord telegram Code JetBrains \
-    pip npm yarn go-build
+# Folders under ~/.cache that MAY be migrated.
+# Anything not listed here is left alone.
+# 'paru'/'yay' are intentionally absent: modul paru menangani
+# ~/.cache/paru/clone sendiri lewat symlink terpisah.
+set -g CSM_CACHE_WHITELIST mozilla google-chrome chromium zen pip yarn npm \
+    go-build cargo thumbnails electron node-gyp clangd
 
-# Folders under ~/.cache to NEVER migrate.
-set -g CSM_CACHE_SKIP mesa_shader_cache mesa_shader_cache_db \
-    fontconfig dconf ibus fcitx5
+# Folders under ~/.cache that must NEVER be migrated.
+# This wins over CSM_CACHE_WHITELIST.
+set -g CSM_CACHE_BLACKLIST fontconfig mesa_shader_cache mesa_shader_cache_db \
+    nvidia pipewire wireplumber systemd dconf ibus fcitx5 ksycoca5 \
+    plasmashell gnome-shell
 
-# Cache module configuration
-set -q CSM_CACHE_DIR; or set -gx CSM_CACHE_DIR "$CSM_ROOT/cache"
-set -q CSM_CACHE_WHITELIST; or set -gx CSM_CACHE_WHITELIST mozilla google-chrome chromium zen pip yarn npm go-build cargo thumbnails electron node-gyp clangd
-set -q CSM_CACHE_BLACKLIST; or set -gx CSM_CACHE_BLACKLIST fontconfig mesa_shader_cache nvidia pipewire wireplumber systemd dconf ksycoca5 plasmashell gnome-shell
+# ------------------------------------------------------------
+# Steam & gaming
+# ------------------------------------------------------------
 
-# Steam module configuration
-set -q CSM_WINEPREFIX_DIR; or set -gx CSM_WINEPREFIX_DIR "$CSM_ROOT/apps/wine-prefixes"
-set -q CSM_SHADERCACHE_DIR; or set -gx CSM_SHADERCACHE_DIR "$CSM_ROOT/shader-cache"
+# Proton/Wine prefixes (Steam compatdata).
+set -g CSM_WINEPREFIX_DIR "$CSM_ROOT/apps/wine-prefixes"
+
+# Shader caches (Steam shadercache, DXVK, Mesa).
+set -g CSM_SHADERCACHE_DIR "$CSM_ROOT/shader-cache"

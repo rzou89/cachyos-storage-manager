@@ -1,153 +1,220 @@
 # CachyOS Storage Manager
 
-![Version](https://img.shields.io/badge/version-1.1.1-blue)
+![Version](https://img.shields.io/badge/version-1.1.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Shell](https://img.shields.io/badge/shell-fish-4aae47)
 
-Unified storage manager for CachyOS and Arch Linux: move Flatpak data, pacman cache, paru cache, and user cache to another drive — with config-based migration instead of fragile symlinks.
+Pindahkan data besar (Flatpak, Steam, pacman, paru, cache user, toolchain
+development) dari NVMe utama ke drive sekunder — otomatis, idempotent, dan
+bisa dikembalikan.
 
-**New to CSM?** Read [docs/tutorial.md](docs/tutorial.md) first — it walks through first-time setup, daily use, and recovery.
+**Baru pakai CSM?** Baca [docs/tutorial.md](docs/tutorial.md) dulu: setup
+pertama kali, pemakaian harian, dan cara recovery.
 
-## Modules
+## Fitur utama
 
-Module | What it manages | Commands
----|---|---
-`flatpak` | Flatpak user data, system installation, and watcher | `csm flatpak ...`
-`steam` | Proton compatdata, shader caches, orphan prefixes | `csm steam ...`
-`cache` | Selected folders under `~/.cache` | `csm cache status`, `csm cache migrate`
-Setup migrations | App data, development tools, system data, paru, and pacman | `csm setup`
+- Satu CLI (`csm`) dengan subperintah per modul.
+- Strategi **symlink** untuk folder user, **CacheDir ganda** untuk pacman
+  (aman kalau drive target tidak ke-mount).
+- **Verifikasi sebelum hapus**: sumber tidak pernah dihapus sebelum isinya
+  dipastikan sudah ada di target.
+- **Idempotent**: aman dijalankan berulang kali.
+- Setiap perintah merusak selalu minta konfirmasi, dan setiap perubahan
+  file sistem dibackup dulu.
 
 ## Requirements
 
-  * Linux (CachyOS or Arch-based)
-  * Fish shell
-  * Flatpak, pacman, paru (only for the modules that use them)
-  * `inotify-tools` (for the Flatpak watcher)
+- Linux (CachyOS / Arch-based)
+- Fish shell
+- `rsync` (disarankan; tanpa itu CSM fallback ke `cp -a`)
+- `findmnt` (util-linux) untuk deteksi mount
+- `flatpak`, `pacman`, `paru` — hanya untuk modul yang memakainya
+- `inotify-tools` (`inotifywait`) untuk Flatpak watcher
+- `sudo` — hanya untuk modul `pacman` dan `flatpak core`
 
-## Installation
+## Instalasi
 
-    git clone git@github.com:rzou89/cachyos-storage-manager.git
-    cd cachyos-storage-manager
-    ./setup.fish
+```bash
+git clone https://github.com/rzou89/cachyos-storage-manager.git
+cd cachyos-storage-manager
+./setup.fish
+```
 
-The installer will:
+Installer akan:
 
-  1. Copy the `csm` entry point to `~/.local/bin/csm`.
-  2. Copy modules to `~/.local/share/cachyos-storage-manager/modules/`.
-  3. Copy an example config to `~/.config/cachyos-storage-manager/config.fish`.
-  4. Install and enable the Flatpak watcher user service.
+1. Menyalin entry point ke `~/.local/bin/csm`.
+2. Menyalin inti CLI ke `~/.local/share/cachyos-storage-manager/csm.fish`.
+3. Menyalin modul ke `~/.local/share/cachyos-storage-manager/modules/`.
+4. Menyalin contoh config ke `~/.config/cachyos-storage-manager/config.fish`.
+5. Memasang dan mengaktifkan systemd user service untuk Flatpak watcher.
 
-Then run the interactive wizard:
+Lalu jalankan wizard:
 
-    csm setup
+```bash
+csm setup
+```
 
-This configures a root folder on the target drive. Active modules create their
-data under the following shared layout as needed:
+## Struktur folder di drive target
 
-    <target>/CachyOS-Storage-Data-Migration/
-    ├── apps/               (launchers and Wine prefixes)
-    ├── cache/              (user, paru, and pacman caches)
-    ├── dev/                (development tools and data)
-    ├── flatpak/            (user data and optional system installation)
-    ├── shader-cache/
-    └── system/
+```
+<target>/CachyOS-Storage-Data-Migration/
+├── apps/               launcher game + Wine prefixes (Steam compatdata)
+├── cache/              cache user, paru, pacman
+├── dev/                toolchain & cache development
+├── flatpak/
+│   ├── flatpak-data/   data user Flatpak (~/.var/app/<app-id>)
+│   └── flatpak-core/   instalasi Flatpak sistem (perlu sudo)
+├── shader-cache/       Steam/DXVK/Mesa shader cache
+└── system/             tema & aesthetics
+```
 
-Steam Wine prefixes use `apps/wine-prefixes` by default. Shader caches use
-`shader-cache/`.
+> Flatpak **core** (binary aplikasi, runtime, repo OSTree) adalah instalasi
+> Flatpak terpisah yang terdaftar di `/etc/flatpak/installations.d/`.
+> `csm setup` hanya membuatkan foldernya; pemindahannya manual lewat
+> `csm flatpak migrate-core` (butuh sudo).
 
-The Flatpak **core** (application binaries, runtime, repo) is a separate
-Flatpak installation, registered in `/etc/flatpak/installations.d/`.
-By default `csm setup` does not move it — it only creates the folder
-placeholder. See the tutorial for moving it manually.
+## Perintah
 
-## Commands
+```bash
+csm                       Tampilkan help
+csm setup                 Wizard setup pertama kali
+csm status                Dashboard pemakaian storage per kategori
+csm doctor                Cek dependensi & kesehatan servis
+csm restore               Kembalikan data yang didukung ke drive lokal
+csm version               Tampilkan versi
+```
 
-    csm setup                    First-time setup wizard
-    csm status                   Overall status
-    csm doctor                   Check dependencies and service health
-    csm analyze                  Show storage usage by category
-    csm restore                  Restore supported data to the local drive
-    csm version                  Show version
+### Konfigurasi
 
-### Flatpak module
+```bash
+csm edit                  Tampilkan config
+csm edit open             Buka config di $EDITOR
+csm edit validate         Validasi config
+csm relocate <path>       Pindah seluruh data ke drive lain
+```
 
-    csm flatpak status           Show installations, apps, disk usage
-    csm flatpak migrate          Move ~/.var/app data to target drive
-    csm flatpak migrate-core     Move /var/lib/flatpak apps to custom installation
-    csm flatpak cleanup          Remove unused refs from default installation
-    csm flatpak watch            Run the watcher in foreground
+### Modul `cache`
+
+Folder di bawah `~/.cache` yang masuk `CSM_CACHE_WHITELIST` dipindah ke
+`$CSM_CACHE_DIR/<nama>` lalu diganti symlink. Shader cache masuk
+`$CSM_SHADERCACHE_DIR`.
+
+```bash
+csm cache status          Status folder cache & status migrasinya
+csm cache migrate         Pindah folder whitelist ke drive target
+csm cache revert          Kembalikan folder ke ~/.cache
+```
+
+### Modul `steam`
+
+```bash
+csm steam status          Proton compatdata & shader cache
+csm steam migrate         Pindah compatdata & shadercache
+csm steam revert          Kembalikan ke lokasi asli
+csm steam clean-orphans   Hapus prefix game yang sudah di-uninstall
+```
+
+### Modul `pacman`
+
+Butuh `sudo`. Memakai dua entri `CacheDir` di `/etc/pacman.conf`: target
+lebih dulu (unduhan baru), lalu `/var/cache/pacman/pkg/` sebagai fallback
+kalau drive target tidak ke-mount.
+
+```bash
+csm pacman status         Tampilkan kedua cache + isi CacheDir aktif
+csm pacman migrate        Salin cache ke target & daftarkan CacheDir
+csm pacman cleanup-old    Hapus *.pkg.tar.zst* lama di source
+csm pacman revert         Hapus CacheDir & opsional kembalikan data
+```
+
+> `pacman.conf` tidak mendukung spasi di `CacheDir`. Pastikan `CSM_TARGET`
+> / `CSM_PACMAN_DIR` bebas spasi.
+
+### Modul `paru`
+
+```bash
+csm paru status           Status symlink ~/.cache/paru/clone
+csm paru migrate          Pindah clone AUR ke target & symlink
+csm paru revert           Lepas symlink, kembalikan data
+```
+
+### Modul `flatpak`
+
+```bash
+csm flatpak status            Instalasi, aplikasi, pemakaian disk
+csm flatpak migrate           Pindah ~/.var/app ke drive target
+csm flatpak migrate-core      Pindah /var/lib/flatpak ke instalasi custom
+csm flatpak core-status       Status instalasi core
+csm flatpak relocate-core <path>   Pindah core ke path lain
+csm flatpak cleanup           Hapus ref yang tidak terpakai
+csm flatpak watch             Jalankan watcher di foreground
+```
 
 ## Flatpak Watcher
 
-The Flatpak module ships a user-level systemd service that watches
-`~/.var/app` and `/var/lib/flatpak` and automatically migrates new
-Flatpak data to the target drive.
+Service systemd level user yang memantau `~/.var/app` dan `/var/lib/flatpak`,
+lalu memindahkan data Flatpak baru ke drive target otomatis.
 
-Enable it:
+```bash
+systemctl --user enable --now csm-flatpak-watcher.service
+systemctl --user status csm-flatpak-watcher.service
+journalctl --user -u csm-flatpak-watcher.service -f
+```
 
-    systemctl --user enable --now csm-flatpak-watcher.service
+`csm setup` mengaktifkannya otomatis kalau `CSM_FLATPAK_WATCH=1`.
 
-Check it:
+## Konfigurasi
 
-    systemctl --user status csm-flatpak-watcher.service
-    journalctl --user -u csm-flatpak-watcher.service -f
+File: `~/.config/cachyos-storage-manager/config.fish`
 
-`csm setup` enables it automatically when watching is enabled in the config.
-
-## Configuration
-
-Config file: `~/.config/cachyos-storage-manager/config.fish`
-Open it directly with your preferred text editor.
-
-Variable | Default | Description
+Variabel | Default | Keterangan
 ---|---|---
-`CSM_TARGET` | `/mnt/DataCachyOS` | Drive where CSM data lives.
-`CSM_ROOT` | `$CSM_TARGET/CachyOS-Storage-Data-Migration` | Base folder on the target drive.
-`CSM_FLATPAK_DIR` | `$CSM_ROOT/flatpak/flatpak-data` | Flatpak user data location.
-`CSM_FLATPAK_CORE_DIR` | `$CSM_ROOT/flatpak/flatpak-core/system` | Flatpak system installation path.
-`CSM_FLATPAK_INSTALLATION` | `datacachyos` | Custom Flatpak installation name. Find with `flatpak --installations`.
-`CSM_FLATPAK_WATCH` | `1` | Enable the Flatpak watcher service.
-`CSM_PARU_DIR` | `$CSM_ROOT/cache/paru` | Paru clone target (symlinked from `~/.cache/paru/clone`).
-`CSM_PACMAN_DIR` | `$CSM_ROOT/cache/pacman` | Pacman cache location.
-`CSM_CACHE_DIR` | `$CSM_ROOT/cache` | User cache target.
-`CSM_WINEPREFIX_DIR` | `$CSM_ROOT/apps/wine-prefixes` | Steam Proton compatdata target.
-`CSM_SHADERCACHE_DIR` | `$CSM_ROOT/shader-cache` | Steam shader cache target.
-`CSM_BACKUP_BEFORE_MIGRATE` | `1` | Create a backup before migrating.
+`CSM_TARGET` | `/mnt/DataCachyOS` | Drive tempat data CSM hidup. **Tanpa spasi.**
+`CSM_ROOT` | `$CSM_TARGET/CachyOS-Storage-Data-Migration` | Folder dasar di drive target.
+`CSM_BACKUP_BEFORE_MIGRATE` | `1` | Backup sebelum migrasi.
+`CSM_FLATPAK_DIR` | `$CSM_ROOT/flatpak/flatpak-data` | Data user Flatpak.
+`CSM_FLATPAK_CORE_DIR` | `$CSM_ROOT/flatpak/flatpak-core/system` | Instalasi Flatpak sistem.
+`CSM_FLATPAK_INSTALLATION` | `datacachyos` | Nama instalasi custom. Cek: `flatpak --installations`.
+`CSM_FLATPAK_WATCH` | `1` | Aktifkan watcher.
+`CSM_PARU_DIR` | `$CSM_ROOT/cache/paru` | Target clone paru.
+`CSM_PACMAN_DIR` | `$CSM_ROOT/cache/pacman` | Cache paket pacman.
+`CSM_CACHE_DIR` | `$CSM_ROOT/cache` | Target cache user.
+`CSM_CACHE_WHITELIST` | `mozilla chrome pip npm ...` | Folder `~/.cache` yang **boleh** dipindah.
+`CSM_CACHE_BLACKLIST` | `mesa_shader_cache fontconfig ...` | Folder yang **tidak boleh** dipindah (menang atas whitelist).
+`CSM_WINEPREFIX_DIR` | `$CSM_ROOT/apps/wine-prefixes` | Target Proton compatdata.
+`CSM_SHADERCACHE_DIR` | `$CSM_ROOT/shader-cache` | Target shader cache.
 
-Older configs that still use compatibility aliases like `CSM_FLATPAK_DATA_DIR`
-or `CSM_PARU_CLONE_DIR` are still accepted during normalization.
+Config lama yang masih memakai alias `CSM_FLATPAK_DATA_DIR`,
+`CSM_PARU_CLONE_DIR`, `CSM_PACMAN_CACHE_DIR`, `CSM_CACHE_TARGET`,
+`CSM_CACHE_MIGRATE`, `CSM_CACHE_SKIP` tetap diterima — nilainya
+dinormalisasi otomatis saat config dibaca.
 
 ## Design Principles
 
-  1. **Config-based, not symlink-based** where possible.
-  2. **Idempotent** — safe to run repeatedly.
-  3. **Confirm before destructive actions.**
-  4. **Detect mount** — abort if the target drive is not mounted.
-  5. **Never touch** `/usr`, `/etc`, or installed packages.
+1. **Verifikasi sebelum hapus** — sumber tidak dihapus sampai isinya
+   terbukti ada di target.
+2. **Idempotent** — aman dijalankan berulang kali.
+3. **Konfirmasi sebelum aksi destruktif.**
+4. **Deteksi mount** — peringatkan kalau target bukan filesystem terpisah.
+5. **Tidak menyentuh** `/usr`, paket terpasang, atau data di luar daftar
+   yang dikelola.
+6. **Revert selalu tersedia** untuk setiap modul.
 
-## Documentation
+## Uninstall
 
-- [docs/tutorial.md](docs/tutorial.md) — step-by-step tutorial
-- [CHANGELOG.md](CHANGELOG.md) — version history
+```bash
+csm restore          # kembalikan data ke drive lokal (opsional)
+csm pacman revert    # kalau pernah migrasi cache pacman
+./uninstall.fish
+```
+
+Data di drive target **tidak** dihapus oleh uninstaller.
+
+## Dokumentasi
+
+- [docs/tutorial.md](docs/tutorial.md) — tutorial langkah demi langkah
+- [CHANGELOG.md](CHANGELOG.md) — riwayat versi
 
 ## License
 
-MIT License — see LICENSE.
-### Cache Module (`csm cache`)
-Safe, granular cache management using Whitelist-First + Pre-flight safety checks.
-
-```bash
-csm cache status    # Scan ~/.cache items, size, and classification
-csm cache migrate   # Safely migrate whitelisted cache items to target drive
-csm cache revert    # Restore migrated cache items back to ~/.cache
-```
-
-### Steam & Gaming Module (`csm steam`)
-Manages Proton Wine prefixes (`compatdata`), Vulkan shader caches, and orphan prefixes from uninstalled games.
-
-```bash
-csm steam status           # Scan Steam compatdata & shadercache sizes and status
-csm steam migrate          # Migrate compatdata & shadercache to secondary drive
-csm steam revert           # Restore migrated Steam components back to main drive
-csm steam clean-orphans    # Scan for leftover Proton prefixes of uninstalled games
-```
+MIT — lihat `LICENSE`.

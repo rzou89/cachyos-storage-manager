@@ -100,25 +100,34 @@ csm steam migrate
 csm cache migrate
 ```
 
-These commands can be run again to migrate newly created data.
+These commands can be run again to migrate newly created data. Each one is
+idempotent: already-migrated folders are skipped.
 
 ### Undo
 
 ```fish
-csm steam revert
+csm steam revert      # Steam compatdata + shader caches
+csm cache revert      # ~/.cache folders
+csm paru revert       # AUR clone cache
+csm pacman revert     # pacman CacheDir entries (needs sudo)
+csm restore           # launchers, dev tools, system data
 ```
 
-This restores Steam compatdata and shader caches to their original locations.
+Each `revert` moves the data back and removes the symlink. The copy on the
+target drive is only deleted after the data has been verified back at the
+original location.
 
 ---
 
 ## 4. Checking status
 
 ```fish
-csm status            # overall
+csm status            # overall: usage per category + per item
 csm flatpak status    # flatpak installations, apps, disk usage
 csm steam status      # Steam compatdata and shader cache
 csm cache status      # selected user cache entries
+csm pacman status     # both package caches + /etc/pacman.conf
+csm paru status       # AUR clone symlink
 csm doctor            # dependency + service health
 ```
 
@@ -126,9 +135,20 @@ csm doctor            # dependency + service health
 
 ## 5. Changing the target drive
 
-Changing the target drive is not exposed through the supported CLI in this
-release. Keep the current target configured until you have backed up and
-verified a migration procedure for every module.
+```fish
+csm relocate /mnt/NewDrive
+```
+
+This will:
+
+1. Validate the new drive (absolute path, exists, mounted, writable).
+2. Stop the Flatpak watcher temporarily.
+3. Back up the config.
+4. Move the migrated module data to the new drive.
+5. Rewrite the config to point at the new drive.
+6. Ask whether to delete the old data (default: no).
+
+The old data is **not** deleted unless you explicitly confirm it.
 
 ---
 
@@ -154,21 +174,77 @@ csm flatpak relocate-core --dry-run \
 
 ## 7. Pacman and paru caches
 
-The setup wizard runs the pacman and paru migration modules. Their individual
-subcommands are not currently exposed by the `csm` command dispatcher. Do not
-use older guides that show `csm pacman ...` or `csm paru ...` commands.
+### Paru
+
+Paru clones AUR repositories into `~/.cache/paru/clone`. CSM moves that
+folder to `$CSM_PARU_DIR` and leaves a symlink behind, so paru itself is
+never modified.
+
+```fish
+csm paru status      # is the symlink in place?
+csm paru migrate     # move the clone cache and symlink it
+csm paru revert      # undo
+```
+
+### Pacman
+
+> Requires `sudo`. Do not run it while `pacman`, `paru`, or `yay` is running.
+
+Pacman cannot use a symlink for its cache, so CSM adds **two** `CacheDir`
+entries to `/etc/pacman.conf`:
+
+```ini
+# Added by CachyOS Storage Manager
+CacheDir = /mnt/DataCachyOS/CachyOS-Storage-Data-Migration/cache/pacman/pkg/
+CacheDir = /var/cache/pacman/pkg/
+```
+
+The first one is where new downloads go. The second is the fallback, so
+pacman still works if the target drive is not mounted.
+
+```fish
+csm pacman status        # both caches + the active CacheDir lines
+csm pacman migrate       # copy the cache and register CacheDir
+csm pacman cleanup-old   # delete the old *.pkg.tar.zst* from /var/cache
+csm pacman revert        # remove CacheDir, optionally move data back
+```
+
+`csm pacman migrate` makes a timestamped backup of `/etc/pacman.conf` first
+and restores it if anything fails. It does **not** delete the old cache —
+verify with `csm pacman status` and `sudo pacman -Sy` first, then run
+`csm pacman cleanup-old` when you are confident.
+
+> `pacman.conf` does not allow spaces in `CacheDir`. If your `CSM_TARGET`
+> contains a space, the module will refuse to run.
 
 ## 8. Editing the config
 
-Open `~/.config/cachyos-storage-manager/config.fish` in a text editor. It is a
-Fish script; the next `csm` command loads its values.
+```fish
+csm edit              # show the config
+csm edit open         # open it in $EDITOR (falls back to nano/vi)
+csm edit validate     # print every resolved variable and check them
+```
+
+You can also open `~/.config/cachyos-storage-manager/config.fish` directly in
+any text editor. It is a Fish script; the next `csm` command loads its values.
+
+To change which `~/.cache` folders are migrated, edit `CSM_CACHE_WHITELIST`.
+A folder listed in `CSM_CACHE_BLACKLIST` is never migrated, even if it also
+appears in the whitelist.
 
 ## 9. Uninstalling
 
-Before uninstalling, use the supported restore commands for data you want to
-bring back. Check that applications work from their original locations.
+Undo the migrations first, in this order:
 
-Then run the uninstaller:
+```fish
+csm pacman revert     # if you migrated the pacman cache (needs sudo)
+csm paru revert
+csm steam revert
+csm cache revert
+csm restore           # everything else
+```
+
+Then check that applications work from their original locations, and run:
 
 ```fish
 ./uninstall.fish

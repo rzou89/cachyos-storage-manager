@@ -5,9 +5,9 @@
 # ============================================================
 
 set -l APP_NAME "CachyOS Storage Manager"
-set -l MODULE_DIR "$HOME/.local/share/cachyos-storage-manager/modules"
 set -l INSTALL_DIR "$HOME/.local/bin"
 set -l SHARE_DIR "$HOME/.local/share/cachyos-storage-manager"
+set -l MODULE_DIR "$SHARE_DIR/modules"
 set -l CONFIG_DIR "$HOME/.config/cachyos-storage-manager"
 set -l CONFIG_FILE "$CONFIG_DIR/config.fish"
 set -l SYSTEMD_USER_DIR "$HOME/.config/systemd/user"
@@ -24,12 +24,20 @@ echo ""
 # Dependencies
 # ------------------------------------------------------------
 
-for cmd in fish
-    if not command -sq $cmd
-        echo "ERROR: '$cmd' is not installed."
-        exit 1
+# Required
+if not command -sq fish
+    echo "ERROR: 'fish' is not installed."
+    exit 1
+end
+echo "OK: fish"
+
+# Optional: only needed by specific modules.
+for cmd in rsync findmnt flatpak pacman paru inotifywait systemctl
+    if command -sq $cmd
+        echo "OK: $cmd"
+    else
+        echo "WARN: $cmd not found (optional, needed by some modules)"
     end
-    echo "OK: $cmd"
 end
 
 # ------------------------------------------------------------
@@ -64,27 +72,31 @@ end
 
 # Layout:
 #   ~/.local/bin/csm
-#   ~/.local/share/cachyos-storage-manager/modules/*.fish
+#   ~/.local/share/cachyos-storage-manager/csm.fish        (core CLI)
+#   ~/.local/share/cachyos-storage-manager/modules/*.fish  (modules)
 
-mkdir -p "$SHARE_DIR/modules"
+if not test -f "$PROJECT_DIR/build/csm"
+    echo "ERROR: missing $PROJECT_DIR/build/csm"
+    exit 1
+end
 
-mkdir -p "$MODULE_DIR"
-    cp "$PROJECT_DIR/scripts/csm.fish" "$MODULE_DIR/csm.fish"
-    echo "OK: module -> $MODULE_DIR/csm.fish"
-for mod in "$PROJECT_DIR/scripts/modules"/*.fish
-    cp "$mod" "$MODULE_DIR/"
-    echo "OK: module -> $MODULE_DIR/"(basename "$mod")
+mkdir -p "$SHARE_DIR" "$MODULE_DIR"
+
+# Stale layout from earlier releases: the core file used to be installed
+# inside modules/. Remove it so it cannot shadow modules/common.fish.
+rm -f "$MODULE_DIR/csm.fish"
+
+cp "$PROJECT_DIR/scripts/csm.fish" "$SHARE_DIR/csm.fish"
+echo "OK: core -> $SHARE_DIR/csm.fish"
+
+for module in "$SOURCE_MODULES"/*.fish
+    set -l name (basename "$module")
+    cp "$module" "$MODULE_DIR/$name"
+    echo "OK: module -> $MODULE_DIR/$name"
 end
 
 cp "$PROJECT_DIR/build/csm" "$INSTALL_DIR/csm"
 chmod +x "$INSTALL_DIR/csm"
-
-for module in "$SOURCE_MODULES"/*.fish
-    set -l name (basename "$module")
-    cp "$module" "$SHARE_DIR/modules/$name"
-    echo "OK: module -> $SHARE_DIR/modules/$name"
-end
-
 echo "OK: installed csm -> $INSTALL_DIR/csm"
 
 # ------------------------------------------------------------

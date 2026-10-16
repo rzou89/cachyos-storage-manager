@@ -1,109 +1,86 @@
 #!/usr/bin/env fish
 # ============================================================
 # CachyOS Storage Manager - Pacman module
+#
+# Strategi: dua entri CacheDir di /etc/pacman.conf.
+#   1. cache di drive target  -> tujuan unduhan baru
+#   2. /var/cache/pacman/pkg/ -> fallback bila drive target tidak mounted
+#
+# Butuh sudo. Tidak menyentuh paket terpasang.
 # ============================================================
 
 # ------------------------------------------------------------
 # Internal helpers
 # ------------------------------------------------------------
 
-# Get the source directory for Pacman's cache
+# Direktori cache pacman bawaan.
 function __csm_pacman_source_dir
     echo "/var/cache/pacman/pkg"
 end
 
-# Get the safe root directory for CSM
-function __csm_pacman_safe_root
-    if not set -q CSM_TARGET
-        echo "ERROR: CSM_TARGET is not set." >&2
-        return 1
-    end
-    echo "$CSM_TARGET/csm"
-end
-
-# Get the target directory for CSM
+# Direktori cache pacman di drive target.
 function __csm_pacman_target_dir
     if not set -q CSM_PACMAN_DIR
         echo "ERROR: CSM_PACMAN_DIR is not configured." >&2
         return 1
     end
-    set -l safe_root (__csm_pacman_safe_root); or return 1
-    echo "$safe_root/pacman/pkg"
-end
-
-# Get the real target directory for Pacman's cache
-function __csm_pacman_real_target_dir
     echo "$CSM_PACMAN_DIR/pkg"
 end
 
-# Get the symlink path for CSM
-function __csm_pacman_symlink_path
-    __csm_pacman_safe_root
+# Symlink legacy: $CSM_TARGET/csm -> $CSM_ROOT.
+# Dibuat oleh versi lama karena nama folder CSM dulu mengandung spasi.
+# Tidak lagi dibuat, hanya dibersihkan saat revert.
+function __csm_pacman_legacy_symlink
+    if not set -q CSM_TARGET
+        return 1
+    end
+    echo "$CSM_TARGET/csm"
 end
 
-# Get the target directory for CSM
-function __csm_pacman_target
-    if set -q CSM_ROOT
-        echo "$CSM_ROOT"
-    else if set -q CSM_TARGET
-        echo "$CSM_TARGET/CachyOS-Storage-Data-Migration"
-    else
-        echo ""
-    end
-end
-# Validate that CSM_TARGET does not contain spaces
-function __csm_pacman_validate_no_spaces
-    if set -q CSM_TARGET
-        if string match -q '* *' "$CSM_TARGET"
-            csm_error "CSM_TARGET contains spaces: $CSM_TARGET"
-            csm_error "Pacman CacheDir does not support spaces."
-            csm_error "Choose a target path without spaces."
-            return 1
-        end
-    end
-    return 0
-end
-
-# Get the path to Pacman's configuration file
 function __csm_pacman_conf
     echo "/etc/pacman.conf"
 end
 
-# Check if Pacman is currently running
-function __csm_pacman_is_running
-    pgrep -x pacman >/dev/null 2>&1
-    or pgrep -x paru >/dev/null 2>&1
-    or pgrep -x yay >/dev/null 2>&1
+function __csm_pacman_marker
+    echo "# Added by CachyOS Storage Manager"
 end
 
-# Require the target directory to be set and mounted
-function __csm_pacman_require_target
-    if not set -q CSM_TARGET
-        echo "ERROR: CSM_TARGET is not set." >&2
-        return 1
+# Cek apakah pacman / AUR helper sedang jalan.
+function __csm_pacman_is_running
+    for proc in pacman paru yay
+        if csm_is_running $proc
+            return 0
+        end
     end
-    if not test -d "$CSM_TARGET"
-        echo "ERROR: target directory does not exist:"
-        echo "  $CSM_TARGET"
-        return 1
-    end
-    if not csm_is_mounted "$CSM_TARGET"
-        echo "ERROR: target is not on a separate filesystem:"
-        echo "  $CSM_TARGET"
-        echo ""
-        echo "Refusing to proceed. Mount the target drive first."
+    return 1
+end
+
+# Pacman tidak mendukung spasi di CacheDir.
+function __csm_pacman_validate_no_spaces
+    set -l dir (__csm_pacman_target_dir); or return 1
+
+    if string match -q '* *' "$dir"
+        csm_error "Pacman cache path contains spaces: $dir"
+        csm_error "Pacman CacheDir does not support spaces."
+        csm_error "Choose a CSM_TARGET / CSM_PACMAN_DIR path without spaces."
         return 1
     end
     return 0
 end
 
-# Check if CSM CacheDir is configured in /etc/pacman.conf
-function __csm_pacman_is_configured
-    # Match either the old (with spaces) or new (symlink) path
-    grep -qE "CacheDir = .*/csm/pacman/pkg|CacheDir = .*CachyOS-Storage-Data-Migration/pacman" /etc/pacman.conf 2>/dev/null
+# Pastikan target siap: terkonfigurasi, ada, mounted.
+function __csm_pacman_require_target
+    csm_require_config; or return 1
+    csm_validate_target; or return 1
+    return 0
 end
 
-# Count the number of package files in a directory
+# Apakah blok CacheDir CSM sudah ada di /etc/pacman.conf?
+function __csm_pacman_is_configured
+    grep -qF (__csm_pacman_marker) (__csm_pacman_conf) 2>/dev/null
+end
+
+# Hitung jumlah file paket di sebuah direktori.
 function __csm_pacman_count_pkg
     set -l dir "$argv[1]"
     if not test -d "$dir"
@@ -113,42 +90,185 @@ function __csm_pacman_count_pkg
     find "$dir" -maxdepth 1 -name '*.pkg.tar.zst*' -type f 2>/dev/null | wc -l | string trim
 end
 
+# Ukuman direktori yang mudah dibaca.
+function __csm_pacman_size
+    set -l dir "$argv[1]"
+    if not test -d "$dir"
+        echo "0"
+        return 0
+    end
+    set -l size (du -sh "$dir" 2>/dev/null | awk '{print $1}')
+    if test -z "$size"
+        echo "0"
+        return 0
+    end
+    echo "$size"
+end
+
+# Jalankan helper Python untuk menambah / menghapus blok CacheDir.
+# Argumen: <add|remove> [cache-dir]
+function __csm_pacman_edit_conf
+    set -l mode "$argv[1]"
+    set -l cache_dir "$argv[2]"
+    set -l conf (__csm_pacman_conf)
+    set -l marker (__csm_pacman_marker)
+
+    set -l script (mktemp /tmp/csm-pacman-XXXXXX.py)
+    set -l py_marker (string escape --style=var -- $marker)
+
+    begin
+        echo 'import pathlib, re, sys'
+        echo ''
+        echo 'CONF = pathlib.Path(sys.argv[1])'
+        echo 'MARKER = sys.argv[2]'
+        echo 'MODE = sys.argv[3]'
+        echo 'TARGET = sys.argv[4] if len(sys.argv) > 4 else ""'
+        echo ''
+        echo 'lines = CONF.read_text().split("\n")'
+        echo ''
+        echo '# Strip any block previously added by CSM.'
+        echo 'out = []'
+        echo 'i = 0'
+        echo 'removed = 0'
+        echo 'while i < len(lines):'
+        echo '    if lines[i].strip() == MARKER:'
+        echo '        i += 1'
+        echo '        while i < len(lines) and re.match(r"^\s*CacheDir\s*=", lines[i]):'
+        echo '            i += 1'
+        echo '            removed += 1'
+        echo '        continue'
+        echo '    out.append(lines[i])'
+        echo '    i += 1'
+        echo ''
+        echo 'if MODE == "remove":'
+        echo '    if removed == 0:'
+        echo '        print("SKIP: no CSM CacheDir block found")'
+        echo '        sys.exit(0)'
+        echo '    CONF.write_text("\n".join(out))'
+        echo '    print("OK: removed %d CacheDir line(s)" % removed)'
+        echo '    sys.exit(0)'
+        echo ''
+        echo 'lines = out'
+        echo 'idx = None'
+        echo 'for i, line in enumerate(lines):'
+        echo '    if re.match(r"^\s*#\s*CacheDir\s*=", line):'
+        echo '        idx = i'
+        echo '        break'
+        echo 'if idx is None:'
+        echo '    for i, line in enumerate(lines):'
+        echo '        if line.strip() == "[options]":'
+        echo '            idx = i'
+        echo '            break'
+        echo 'if idx is None:'
+        echo '    print("FAIL: no CacheDir anchor found in %s" % CONF)'
+        echo '    sys.exit(1)'
+        echo ''
+        echo 'block = [MARKER, "CacheDir = " + TARGET + "/",'
+        echo '         "CacheDir = /var/cache/pacman/pkg/"]'
+        echo 'lines[idx + 1:idx + 1] = block'
+        echo 'CONF.write_text("\n".join(lines))'
+        echo 'print("OK: added CacheDir " + TARGET)'
+    end > "$script"
+
+    chmod 644 "$script"
+    sudo python3 "$script" "$conf" "$marker" "$mode" "$cache_dir"
+    set -l result $status
+    rm -f "$script"
+    return $result
+end
+
 # ------------------------------------------------------------
-# Status
+# Status (read-only)
 # ------------------------------------------------------------
 
 function csm_pacman_status
+    csm_require_config; or return 1
+
     csm_section "Pacman Module Status"
 
     set -l source (__csm_pacman_source_dir)
-    set -l real_target (__csm_pacman_real_target_dir)
-    set -l safe_root (__csm_pacman_safe_root)
-    set -l safe_target "$safe_root/pacman/pkg"
+    set -l target (__csm_pacman_target_dir); or return 1
     set -l conf (__csm_pacman_conf)
-    set -l symlink_target (__csm_pacman_symlink_target)
+
+    set -l src_count (__csm_pacman_count_pkg "$source")
+    set -l src_size (__csm_pacman_size "$source")
+    set -l tgt_count (__csm_pacman_count_pkg "$target")
+    set -l tgt_size (__csm_pacman_size "$target")
+
+    echo "Source cache : $source ($src_size, $src_count files)"
+    echo "Target cache : $target ($tgt_size, $tgt_count files)"
+    echo "Config       : $conf"
+    echo ""
+
+    if __csm_pacman_is_configured
+        csm_ok "CSM CacheDir terdaftar di $conf"
+    else
+        csm_warn "CSM CacheDir belum terdaftar."
+        echo "      Jalankan: csm pacman migrate"
+    end
+
+    echo ""
+    echo "CacheDir aktif di $conf:"
+    set -l cachedirs (grep -E '^\s*CacheDir' "$conf" 2>/dev/null)
+    if test (count $cachedirs) -eq 0
+        echo "  (tidak ada)"
+    else
+        printf '  %s\n' $cachedirs
+    end
+
+    if __csm_pacman_is_running
+        echo ""
+        csm_warn "pacman / AUR helper sedang berjalan."
+    end
+
+    echo ""
+end
+
+# ------------------------------------------------------------
+# Migrate
+# ------------------------------------------------------------
+
+function csm_pacman_migrate
+    csm_section "Pacman Cache Migration"
+
+    __csm_pacman_require_target; or return 1
+    __csm_pacman_validate_no_spaces; or return 1
+
+    if __csm_pacman_is_running
+        csm_error "pacman / AUR helper sedang berjalan. Tutup dulu, lalu ulangi."
+        return 1
+    end
+
+    if not csm_have rsync
+        csm_error "rsync tidak ditemukan. Install: sudo pacman -S rsync"
+        return 1
+    end
+
+    set -l source (__csm_pacman_source_dir)
+    set -l target (__csm_pacman_target_dir); or return 1
+    set -l conf (__csm_pacman_conf)
 
     set -l count (__csm_pacman_count_pkg "$source")
-    set -l size (du -sh "$source" 2>/dev/null | awk '{print $1}')
+    set -l size (__csm_pacman_size "$source")
 
-    echo "Source     : $source ($size, $count files)"
-    echo "Real target: $real_target"
-    echo "Symlink    : $safe_root -> $symlink_target"
-    echo "CacheDir   : $safe_target (no spaces — pacman.conf limitation)"
-    echo "Config     : $conf"
+    echo "Source : $source ($size, $count files)"
+    echo "Target : $target"
+    echo "Config : $conf"
+    echo ""
+    echo "Langkah:"
+    echo "  1. Salin paket dari source ke target (rsync)"
+    echo "  2. Tambah dua baris CacheDir ke $conf"
+    echo "     - target lebih dulu (untuk unduhan baru)"
+    echo "     - source sebagai fallback"
+    echo "  3. TIDAK menghapus apa pun dari source"
+    echo ""
 
-    echo "This will:"
-    echo "  1. Create symlink $safe_root"
-    echo "  2. Copy packages from source to target (via rsync)"
-    echo "  3. Add two CacheDir lines to $conf (using the symlink path)"
-    echo "     - target first (for new downloads)"
-    echo "     - original second (fallback)"
-    echo "  4. NOT delete anything from source"
-
-    if not csm_confirm "Proceed? (sudo required)" "N"
+    if not csm_confirm "Lanjut? (sudo required)" "N"
         echo "Cancelled."
         return 1
     end
 
+    echo ""
     echo "Requesting sudo..."
     sudo -v
     if test $status -ne 0
@@ -161,109 +281,72 @@ function csm_pacman_status
     set -l conf_backup "$conf.bak.$timestamp"
     sudo cp "$conf" "$conf_backup"
     if test $status -ne 0
-        csm_error "Failed to backup $conf"
+        csm_error "Gagal backup $conf"
         return 1
     end
     csm_ok "Config backup: $conf_backup"
 
-    # Create symlink (no spaces) if missing
-    if not test -L "$safe_root"
-        if test -e "$safe_root"
-            csm_error "Path exists but is not a symlink: $safe_root"
-            csm_error "Remove it manually, then retry."
-            return 1
-        end
-        sudo ln -s "$symlink_target" "$safe_root"
-        if test $status -ne 0
-            csm_error "Failed to create symlink: $safe_root"
-            return 1
-        end
-        csm_ok "Symlink created: $safe_root -> $symlink_target"
-    else
-        set -l current (readlink "$safe_root")
-        if test "$current" != "$symlink_target"
-            csm_error "Existing symlink points elsewhere:"
-            echo "  $safe_root -> $current"
-            echo "Expected: $symlink_target"
-            return 1
-        end
-        csm_ok "Symlink already present: $safe_root"
-    end
-
-    # Prepare real target
-    mkdir -p "$real_target"
-    if test $status -ne 0
-        csm_error "Failed to create target: $real_target"
+    # Siapkan target
+    if not mkdir -p "$target"
+        csm_error "Gagal membuat target: $target"
         return 1
     end
 
-    # rsync
-    echo "Copying packages (this may take a minute)..."
-    sudo rsync -aHAX --info=progress2 "$source/" "$real_target/"
+    # Salin paket
+    echo ""
+    echo "Menyalin paket (ini bisa memakan waktu)..."
+    sudo rsync -aHAX --info=progress2 "$source/" "$target/"
     if test $status -ne 0
-        csm_error "rsync failed"
+        csm_error "rsync gagal. $conf tidak diubah."
         return 1
     end
 
-    # Verify
-    set -l target_count (__csm_pacman_count_pkg "$real_target")
+    # Verifikasi
+    set -l target_count (__csm_pacman_count_pkg "$target")
     if test "$target_count" -lt "$count"
-        csm_error "Verification failed:"
-        echo "  source files: $count"
-        echo "  target files: $target_count"
+        csm_error "Verifikasi gagal:"
+        echo "  file di source: $count"
+        echo "  file di target: $target_count"
         echo ""
-        echo "Not updating $conf. You may retry after investigating."
+        echo "$conf tidak diubah. Periksa lalu ulangi."
         return 1
     end
-    csm_ok "Copied: $target_count files at target"
+    csm_ok "Tersalin: $target_count file di target"
 
-    # Update /etc/pacman.conf via Python
-    set -l tmpscript (mktemp /tmp/csm-pacman-XXXXXX.py)
-    begin
-        echo 'import pathlib, sys'
-        echo 'conf = pathlib.Path("/etc/pacman.conf")'
-        echo 's = conf.read_text()'
-        echo 'target = sys.argv[1]'
-        echo 'marker = "#CacheDir    = /var/cache/pacman/pkg/"'
-        echo 'if "CachyOS-Storage-Data-Migration/pacman" in s:'
-        echo '    print("SKIP: already configured")'
-        echo '    sys.exit(0)'
-        echo 'if marker not in s:'
-        echo '    print("FAIL: marker not found in /etc/pacman.conf")'
-        echo '    sys.exit(1)'
-        echo 'addition = marker + "\n# Added by CachyOS Storage Manager"'
-        echo 'addition += "\nCacheDir = " + target + "/"'
-        echo 'addition += "\nCacheDir = /var/cache/pacman/pkg/"'
-        echo 's = s.replace(marker, addition, 1)'
-        echo 'conf.write_text(s)'
-        echo 'print("OK")'
-    end > "$tmpscript"
-    sudo python3 "$tmpscript" "$safe_target"
-    set -l pyresult $status
-    rm -f "$tmpscript"
-    if test $pyresult -ne 0
-        csm_error "Failed to update $conf"
-        echo "Restoring from backup..."
+    # Update /etc/pacman.conf
+    if not __csm_pacman_edit_conf add "$target"
+        csm_error "Gagal memperbarui $conf"
+        echo "Mengembalikan dari backup..."
         sudo cp "$conf_backup" "$conf"
         return 1
     end
-    csm_ok "Updated $conf"
+    csm_ok "Diperbarui: $conf"
 
-    # Update CSM config if CSM_PACMAN_DIR not set
+    # Pastikan CSM_PACMAN_DIR tercatat di config CSM
     set -l csm_cfg (csm_config_path)
     if test -f "$csm_cfg"
         if not grep -q '^set -g CSM_PACMAN_DIR' "$csm_cfg"
-            echo "set -g CSM_PACMAN_DIR \"\$CSM_ROOT/pacman\"" >> "$csm_cfg"
-            csm_ok "Added CSM_PACMAN_DIR to $csm_cfg"
+            echo "set -g CSM_PACMAN_DIR \"\$CSM_ROOT/cache/pacman\"" >> "$csm_cfg"
+            csm_ok "CSM_PACMAN_DIR ditambahkan ke $csm_cfg"
         end
     end
 
-    # Tutorial
+    # Bersihkan symlink legacy bila ada
+    set -l legacy (__csm_pacman_legacy_symlink)
+    if test -n "$legacy"; and test -L "$legacy"
+        csm_log "Symlink legacy ditemukan: $legacy -> "(readlink "$legacy")
+        if csm_confirm "Hapus symlink legacy ini?" "N"
+            sudo rm "$legacy"
+            csm_ok "Symlink legacy dihapus"
+        end
+    end
+
+    echo ""
     echo "========================================"
     echo " Migrasi selesai"
     echo "========================================"
     echo ""
-    echo "Test dulu sebelum hapus file lama:"
+    echo "Uji dulu sebelum menghapus file lama:"
     echo ""
     echo "  1. Cek kedua cache terdeteksi:"
     echo "       csm pacman status"
@@ -272,18 +355,18 @@ function csm_pacman_status
     echo "       sudo pacman -Sy"
     echo ""
     echo "  3. Lihat file baru muncul di target:"
-    echo "       ls \"$safe_target\" | head"
+    echo "       ls \"$target\" | head"
     echo ""
-    echo "  4. Kalau semua OK dan Anda yakin, hapus file lama:"
+    echo "  4. Kalau semua OK dan Anda yakin:"
     echo "       csm pacman cleanup-old"
     echo ""
-    echo "Untuk membatalkan migrasi:"
+    echo "Untuk membatalkan:"
     echo "       csm pacman revert"
     echo ""
 end
 
 # ------------------------------------------------------------
-# Cleanup old (delete .pkg.tar.zst* at /var/cache/pacman/pkg)
+# Cleanup old (hapus .pkg.tar.zst* di source)
 # ------------------------------------------------------------
 
 function csm_pacman_cleanup_old
@@ -291,25 +374,29 @@ function csm_pacman_cleanup_old
 
     set -l source (__csm_pacman_source_dir)
     if not test -d "$source"
-        csm_ok "Source cache does not exist. Nothing to clean."
+        csm_ok "Source cache tidak ada. Tidak ada yang dibersihkan."
         return 0
     end
 
     set -l count (__csm_pacman_count_pkg "$source")
-    set -l size (du -sh "$source" 2>/dev/null | awk '{print $1}')
+    set -l size (__csm_pacman_size "$source")
 
     if test "$count" -eq 0
-        csm_ok "No package files to clean in $source"
+        csm_ok "Tidak ada file paket di $source"
         return 0
     end
 
-    echo "Files to delete (pattern '*.pkg.tar.zst*'):"
-    echo "  Directory : $source"
-    echo "  Count     : $count"
-    echo "  Total size: $size"
+    if not __csm_pacman_is_configured
+        csm_warn "CacheDir CSM belum terdaftar di "(__csm_pacman_conf)"."
+        csm_warn "Menghapus source sekarang berarti kehilangan semua cache."
+    end
+
+    echo "File yang akan dihapus (pola '*.pkg.tar.zst*'):"
+    echo "  Direktori : $source"
+    echo "  Jumlah    : $count"
+    echo "  Ukuran    : $size"
     echo ""
-    echo "Only files matching '*.pkg.tar.zst*' will be deleted."
-    echo "Other files in the directory are left untouched."
+    echo "Hanya file yang cocok dengan pola itu yang dihapus."
     echo ""
     read -P "Ketik 'HAPUS' untuk konfirmasi: " confirm
     if test "$confirm" != "HAPUS"
@@ -319,14 +406,12 @@ function csm_pacman_cleanup_old
 
     sudo find "$source" -maxdepth 1 -name '*.pkg.tar.zst*' -type f -delete
     if test $status -ne 0
-        csm_error "Some files could not be deleted."
+        csm_error "Sebagian file tidak bisa dihapus."
         return 1
     end
+
     echo ""
-    csm_ok "Deleted $count files"
-    echo ""
-    echo "Remaining files in $source:"
-    ls -la "$source" | head -10
+    csm_ok "Dihapus $count file"
     echo ""
 end
 
@@ -338,16 +423,15 @@ function csm_pacman_revert
     csm_section "Pacman Cache Revert"
 
     set -l source (__csm_pacman_source_dir)
-    set -l real_target (__csm_pacman_real_target_dir)
-    set -l safe_root (__csm_pacman_safe_root)
+    set -l target (__csm_pacman_target_dir); or return 1
     set -l conf (__csm_pacman_conf)
 
-    echo "This will:"
-    echo "  1. Remove CSM CacheDir lines from $conf"
-    echo "  2. Remove symlink $safe_root"
-    echo "  3. Optionally move data from $real_target back to $source"
+    echo "Langkah:"
+    echo "  1. Hapus baris CacheDir CSM dari $conf"
+    echo "  2. Hapus symlink legacy bila ada"
+    echo "  3. Opsional: pindahkan data dari $target kembali ke $source"
 
-    if not csm_confirm "Proceed?" "N"
+    if not csm_confirm "Lanjut? (sudo required)" "N"
         echo "Cancelled."
         return 1
     end
@@ -358,117 +442,67 @@ function csm_pacman_revert
         return 1
     end
 
-    # Backup
     set -l timestamp (date '+%Y%m%d-%H%M%S')
     sudo cp "$conf" "$conf.bak.$timestamp"
     csm_ok "Config backup: $conf.bak.$timestamp"
 
-    # Remove our lines via Python
-    set -l tmpscript (mktemp /tmp/csm-pacman-XXXXXX.py)
-    begin
-        echo 'import pathlib, sys'
-        echo 'conf = pathlib.Path("/etc/pacman.conf")'
-        echo 's = conf.read_text()'
-        echo 'target = sys.argv[1]'
-        echo 'needle = "# Added by CachyOS Storage Manager"'
-        echo 'if needle not in s:'
-        echo '    print("SKIP: marker not found")'
-        echo '    sys.exit(0)'
-        echo 'lines = s.split("\n")'
-        echo 'out = []'
-        echo 'skip_next = 0'
-        echo 'for i, line in enumerate(lines):'
-        echo '    if line.strip() == needle:'
-        echo '        skip_next = 2'
-        echo '        continue'
-        echo '    if skip_next > 0 and line.strip().startswith("CacheDir"):'
-        echo '        skip_next -= 1'
-        echo '        continue'
-        echo '    out.append(line)'
-        echo 'conf.write_text("\n".join(out))'
-        echo 'print("OK")'
-    end > "$tmpscript"
-    sudo python3 "$tmpscript" "$real_target"
-    set -l pyresult $status
-    rm -f "$tmpscript"
-    if test $pyresult -ne 0
-        csm_error "Failed to update $conf"
+    if not __csm_pacman_edit_conf remove
+        csm_error "Gagal memperbarui $conf"
         return 1
     end
-    csm_ok "Removed CacheDir lines from $conf"
+    csm_ok "Baris CacheDir CSM dihapus dari $conf"
 
-    # Remove symlink
-    if test -L "$safe_root"
-        sudo rm "$safe_root"
-        if test $status -eq 0
-            csm_ok "Symlink removed: $safe_root"
+    # Symlink legacy
+    set -l legacy (__csm_pacman_legacy_symlink)
+    if test -n "$legacy"; and test -L "$legacy"
+        if sudo rm "$legacy"
+            csm_ok "Symlink legacy dihapus: $legacy"
         else
-            csm_warn "Could not remove symlink: $safe_root"
+            csm_warn "Tidak bisa menghapus symlink: $legacy"
         end
     end
 
-    # Ask about data
-    if test -d "$real_target"
-        set -l count (__csm_pacman_count_pkg "$real_target")
+    # Data
+    if test -d "$target"
+        set -l count (__csm_pacman_count_pkg "$target")
         if test "$count" -gt 0
             echo ""
-            if csm_confirm "Move $count files from target back to source?" "N"
-                mkdir -p "$source"
-                sudo rsync -aHAX "$real_target/" "$source/"
+            if csm_confirm "Pindahkan $count file dari target kembali ke source?" "N"
+                sudo mkdir -p "$source"
+                sudo rsync -aHAX "$target/" "$source/"
                 if test $status -eq 0
-                    csm_ok "Data moved back"
+                    csm_ok "Data dikembalikan"
                 else
-                    csm_warn "Some files could not be moved"
+                    csm_warn "Sebagian file tidak bisa dipindahkan"
                 end
             else
-                echo "Data on target NOT moved."
-                echo "Location: $real_target"
+                echo "Data di target TIDAK dipindahkan."
+                echo "Lokasi: $target"
             end
         end
     end
 
-    csm_ok "Revert complete"
+    csm_ok "Revert selesai"
 end
 
 # ------------------------------------------------------------
-# Help + dispatcher
+# Help
 # ------------------------------------------------------------
 
-function __csm_pacman_help
+function csm_pacman_help
     echo "CachyOS Storage Manager - pacman module"
     echo ""
     echo "Usage:"
-    echo "  csm pacman status         Show both caches + /etc/pacman.conf state"
-    echo "  csm pacman migrate        Copy cache to target and add CacheDir"
-    echo "  csm pacman cleanup-old    Delete old .pkg.tar.zst* from source"
-    echo "  csm pacman revert         Remove CacheDir and optionally move data back"
-    echo "  csm pacman help           Show this help"
+    echo "  csm pacman status         Tampilkan kedua cache + status /etc/pacman.conf"
+    echo "  csm pacman migrate        Salin cache ke target dan daftarkan CacheDir"
+    echo "  csm pacman cleanup-old    Hapus .pkg.tar.zst* lama di source"
+    echo "  csm pacman revert         Hapus CacheDir dan opsional kembalikan data"
     echo ""
-    echo "Strategy: two CacheDir entries. Target first for new downloads,"
-    echo "source second as fallback if the target drive is not mounted."
+    echo "Strategi: dua entri CacheDir. Target lebih dulu untuk unduhan baru,"
+    echo "source kedua sebagai fallback bila drive target tidak mounted."
     echo ""
-    echo "Note: pacman.conf does not support spaces in CacheDir. CSM creates"
-    echo "a symlink \$CSM_TARGET/csm -> \$CSM_ROOT and uses it in the config."
+    echo "Catatan: pacman.conf tidak mendukung spasi di CacheDir."
+    echo "Pastikan CSM_TARGET / CSM_PACMAN_DIR tidak mengandung spasi."
     echo ""
-    echo "Requires sudo. Do not run while pacman/paru/yay is running."
-end
-
-function csm_pacman
-    switch "$argv[1]"
-    case "status" "--status"
-        csm_pacman_status
-    case "migrate" "--migrate"
-        csm_pacman_migrate
-    case "cleanup-old" "cleanup" "--cleanup-old"
-        csm_pacman_cleanup_old
-    case "revert" "--revert"
-        csm_pacman_revert
-    case "help" "-h" "--help" ""
-        __csm_pacman_help
-    case "*"
-        echo "ERROR: unknown pacman subcommand: $argv[1]"
-        echo ""
-        __csm_pacman_help
-        return 1
-    end
+    echo "Butuh sudo. Jangan dijalankan saat pacman/paru/yay berjalan."
 end

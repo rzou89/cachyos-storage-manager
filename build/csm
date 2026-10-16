@@ -1,13 +1,45 @@
 #!/usr/bin/env fish
+#
+# CachyOS Storage Manager - entry point.
+#
+# Load order matters:
+#   1. csm.fish   -> core CLI (csm_main, dispatcher)
+#   2. modules/   -> common helpers first, then the feature modules
+#
+# The core file must NOT live inside modules/, otherwise it would be
+# sourced in alphabetical order and silently override helpers that are
+# defined in modules/common.fish (csm_load_config, csm_doctor, ...).
+
 set -l CSM_SHARE "$HOME/.local/share/cachyos-storage-manager"
-if test -d "$CSM_SHARE/modules"
-    for mod in "$CSM_SHARE/modules"/*.fish
+set -l CSM_CORE "$CSM_SHARE/csm.fish"
+set -l CSM_MODULES "$CSM_SHARE/modules"
+
+if not test -f "$CSM_CORE"
+    echo "[ERROR] CSM core file not found: $CSM_CORE"
+    echo "        Re-run ./setup.fish from the project directory."
+    exit 1
+end
+
+source "$CSM_CORE"
+
+# common.fish provides the helpers every other module depends on.
+if test -f "$CSM_MODULES/common.fish"
+    source "$CSM_MODULES/common.fish"
+end
+
+if test -d "$CSM_MODULES"
+    for mod in "$CSM_MODULES"/*.fish
+        if test (basename "$mod") = "common.fish"
+            continue
+        end
         source "$mod"
     end
 end
-if functions -q csm_main
-    csm_main $argv
-else
+
+if not functions -q csm_main
     echo "[ERROR] CSM core modules failed to load."
     exit 1
 end
+
+csm_main $argv
+exit $status

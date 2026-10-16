@@ -3,10 +3,10 @@
 # ============================================================
 # CachyOS Storage Manager - Setup / Relocate / Edit
 #
-# Wizard-style helpers for first-time setup and for changing
-# the target drive without editing config by hand.
+# Wizard-style helpers untuk setup pertama kali dan untuk memindah
+# target drive tanpa menyunting config secara manual.
 #
-# Public entry points (called from csm.fish):
+# Entry point publik (dipanggil dari csm.fish):
 #   csm_setup       -> csm setup
 #   csm_relocate    -> csm relocate <path>
 #   csm_edit        -> csm edit [show|open|validate]
@@ -17,24 +17,25 @@
 # ------------------------------------------------------------
 
 function __csm_init_watcher_active
-    if not command -sq systemctl
+    if not csm_have systemctl
         return 1
     end
-    systemctl --user is-active csm-flatpak-watcher.service >/dev/null 2>&1
+    systemctl --user is-active --quiet csm-flatpak-watcher.service 2>/dev/null
 end
 
 function __csm_init_watcher_stop
-    if command -sq systemctl
+    if csm_have systemctl
         systemctl --user stop csm-flatpak-watcher.service 2>/dev/null
     end
 end
 
 function __csm_init_watcher_start
-    if command -sq systemctl
+    if csm_have systemctl
         systemctl --user start csm-flatpak-watcher.service 2>/dev/null
     end
 end
 
+# Validasi calon drive target: absolut, ada, mounted, bisa ditulis.
 function __csm_init_validate_drive
     set -l path "$argv[1]"
 
@@ -54,8 +55,7 @@ function __csm_init_validate_drive
         if not csm_confirm "Buat sekarang?" "Y"
             return 1
         end
-        mkdir -p "$path"
-        or begin
+        if not mkdir -p "$path"
             csm_error "Gagal membuat direktori."
             return 1
         end
@@ -81,26 +81,28 @@ function __csm_init_validate_drive
     return 0
 end
 
-# Write a fresh config file from template, preserving values
-# that user may have customised (installation, watch flag).
+# Tulis config baru dari template, mempertahankan nilai yang mungkin
+# sudah dikustomisasi pengguna (installation, watch flag, whitelist).
+# Argumen: <drive-target>
 function __csm_init_write_config
     set -l target "$argv[1]"
     set -l cfg (csm_config_path)
+    set -l root "$target/"(csm_root_name)
 
-    set -l installation "default"
-    if set -q CSM_FLATPAK_INSTALLATION
-        set installation "$CSM_FLATPAK_INSTALLATION"
-    end
+    set -l installation (__csm_default_or CSM_FLATPAK_INSTALLATION "datacachyos")
+    set -l watch (__csm_default_or CSM_FLATPAK_WATCH 1)
+    set -l backup_before (__csm_default_or CSM_BACKUP_BEFORE_MIGRATE 1)
 
-    set -l watch "1"
-    if set -q CSM_FLATPAK_WATCH
-        set watch "$CSM_FLATPAK_WATCH"
-    end
+    # 'paru'/'yay' sengaja tidak ada: modul paru menangani
+    # ~/.cache/paru/clone sendiri lewat symlink terpisah.
+    set -l whitelist (__csm_default_or CSM_CACHE_WHITELIST \
+        mozilla google-chrome chromium zen pip yarn npm go-build \
+        cargo thumbnails electron node-gyp clangd)
 
-    set -l backup_before "1"
-    if set -q CSM_BACKUP_BEFORE_MIGRATE
-        set backup_before "$CSM_BACKUP_BEFORE_MIGRATE"
-    end
+    set -l blacklist (__csm_default_or CSM_CACHE_BLACKLIST \
+        fontconfig mesa_shader_cache mesa_shader_cache_db nvidia \
+        pipewire wireplumber systemd dconf ibus fcitx5 ksycoca5 \
+        plasmashell gnome-shell)
 
     set -l timestamp (date '+%Y-%m-%d %H:%M:%S')
 
@@ -115,57 +117,88 @@ function __csm_init_write_config
         echo "# Edit manually with: csm edit open"
         echo "# ============================================================"
         echo ""
-        echo "# Drive target"
+        echo "# ------------------------------------------------------------"
+        echo "# Global"
+        echo "# ------------------------------------------------------------"
+        echo ""
+        echo "# Drive target (tanpa spasi - dibutuhkan pacman CacheDir)"
         echo "set -g CSM_TARGET \"$target\""
         echo ""
-        echo "# Base folder for all CSM data on the target drive."
-        echo "set -g CSM_ROOT \"\$CSM_TARGET/CachyOS-Storage-Data-Migration\""
+        echo "# Folder dasar seluruh data CSM di drive target."
+        echo "set -g CSM_ROOT \"\$CSM_TARGET/"(csm_root_name)"\""
+        echo ""
+        echo "# Buat backup sebelum migrasi? (1 = ya, 0 = tidak)"
+        echo "set -g CSM_BACKUP_BEFORE_MIGRATE $backup_before"
         echo ""
         echo "# ------------------------------------------------------------"
         echo "# Flatpak"
         echo "# ------------------------------------------------------------"
         echo ""
+        echo "# Data aplikasi Flatpak (~/.var/app/<app-id>)"
         echo "set -g CSM_FLATPAK_DIR \"\$CSM_ROOT/flatpak/flatpak-data\""
+        echo ""
+        echo "# Flatpak core: binary aplikasi, runtime, repo OSTree."
+        echo "# Instalasi terdaftar di /etc/flatpak/installations.d/."
         echo "set -g CSM_FLATPAK_CORE_DIR \"\$CSM_ROOT/flatpak/flatpak-core/system\""
+        echo ""
         echo "set -g CSM_FLATPAK_INSTALLATION \"$installation\""
         echo "set -g CSM_FLATPAK_WATCH $watch"
         echo ""
         echo "# ------------------------------------------------------------"
-        echo "# Paru"
+        echo "# AUR & package caches"
         echo "# ------------------------------------------------------------"
         echo ""
-        echo "set -g CSM_PARU_DIR \"\$CSM_ROOT/paru\""
+        echo "set -g CSM_PARU_DIR \"\$CSM_ROOT/cache/paru\""
+        echo "set -g CSM_PACMAN_DIR \"\$CSM_ROOT/cache/pacman\""
         echo ""
         echo "# ------------------------------------------------------------"
-        echo "# Pacman (reserved, not used yet)"
+        echo "# User cache"
         echo "# ------------------------------------------------------------"
         echo ""
-        echo "set -g CSM_PACMAN_DIR \"\$CSM_ROOT/pacman\""
+        echo "set -g CSM_CACHE_DIR \"\$CSM_ROOT/cache\""
+        echo ""
+        echo "# Folder di bawah ~/.cache yang BOLEH dimigrasikan."
+        echo "set -g CSM_CACHE_WHITELIST $whitelist"
+        echo ""
+        echo "# Folder di bawah ~/.cache yang TIDAK boleh dimigrasikan."
+        echo "set -g CSM_CACHE_BLACKLIST $blacklist"
         echo ""
         echo "# ------------------------------------------------------------"
-        echo "# User Cache (reserved, not used yet)"
+        echo "# Steam & gaming"
         echo "# ------------------------------------------------------------"
         echo ""
-        echo "set -g CSM_CACHE_DIR \"\$CSM_ROOT/data cache\""
-        echo "set -g CSM_CACHE_MIGRATE paru yay thumbnails mozilla chromium \\"
-        echo "    BraveSoftware spotify discord telegram Code JetBrains \\"
-        echo "    pip npm yarn go-build"
-        echo "set -g CSM_CACHE_SKIP  _db \\"
-        echo "    fontconfig dconf ibus fcitx5"
-        echo ""
-        echo "# ------------------------------------------------------------"
-        echo "# Global"
-        echo "# ------------------------------------------------------------"
-        echo ""
-        echo "set -g CSM_BACKUP_BEFORE_MIGRATE $backup_before"
+        echo "set -g CSM_WINEPREFIX_DIR \"\$CSM_ROOT/apps/wine-prefixes\""
+        echo "set -g CSM_SHADERCACHE_DIR \"\$CSM_ROOT/shader-cache\""
     end > "$cfg"
 end
 
-function __csm_init_module_list
-    # Modules that participate in relocate.
-    # Add to this list as new modules get relocate support.
-    echo flatpak
-    echo paru
+# Ambil nilai variabel bila sudah di-set, kalau belum pakai default.
+# Argumen: <nama-variabel> [default...]
+function __csm_default_or
+    set -l name $argv[1]
+    set -l fallback $argv[2..-1]
+
+    if set -q $name
+        echo $$name
+        return 0
+    end
+
+    echo $fallback
+end
+
+# Buat struktur folder CSM di drive target.
+function __csm_init_create_layout
+    set -l root "$argv[1]"
+
+    mkdir -p "$root/apps/wine-prefixes" \
+             "$root/cache/paru" \
+             "$root/cache/pacman" \
+             "$root/dev" \
+             "$root/shader-cache" \
+             "$root/system" \
+             "$root/flatpak/flatpak-data" \
+             "$root/flatpak/flatpak-core"
+    return $status
 end
 
 # ------------------------------------------------------------
@@ -174,96 +207,145 @@ end
 
 function csm_setup
 
-    # Auto-rename legacy directory with spaces if found
-    if test -d "$CSM_TARGET/CachyOS Storage Data Migration"
-        echo "Mendeteksi folder lama dengan spasi. Mengubah nama direktori..."
-        mv "$CSM_TARGET/CachyOS Storage Data Migration" "$CSM_TARGET/CachyOS-Storage-Data-Migration"
-    end
-
-
     csm_section "CachyOS Storage Manager - Setup"
 
     set -l cfg (csm_config_path)
     echo "Config : $cfg"
+    echo ""
+
+    # Rename folder legacy yang memakai spasi.
+    if set -q CSM_TARGET; and test -d "$CSM_TARGET/CachyOS Storage Data Migration"
+        csm_log "Mendeteksi folder lama dengan spasi. Mengubah nama direktori..."
+        if mv "$CSM_TARGET/CachyOS Storage Data Migration" "$CSM_TARGET/"(csm_root_name)
+            csm_ok "Folder lama diganti namanya."
+        else
+            csm_warn "Gagal mengganti nama folder lama. Lanjutkan."
+        end
+    end
+
+    # --- Tentukan drive target ---
+    set -l target ""
 
     if test -f "$cfg"
-        echo ""
-        csm_warn "Config sudah ada."
-        if not csm_confirm "Overwrite? (backup akan dibuat)" "N"
-            echo "Dibatalkan."
-            return 1
+        csm_load_config
+        if set -q CSM_TARGET; and test -n "$CSM_TARGET"
+            echo "[INFO] Drive target yang terkonfigurasi saat ini:"
+            echo "       $CSM_TARGET"
+            echo ""
+            echo "Pilih opsi direktori tujuan:"
+            echo "  [1] Gunakan drive yang sudah disetting sebelumnya (Default)"
+            echo "  [2] Pindah ke drive tujuan baru"
+            echo ""
+            read -P "Pilihan Anda [1/2] (1/Enter untuk lanjut, 2 untuk baru, q untuk batal): " opt_choice
+
+            switch "$opt_choice"
+                case q Q cancel exit
+                    echo "[CANCELLED] Proses wizard dibatalkan oleh pengguna."
+                    return 0
+                case 2
+                    set target ""
+                case '*'
+                    set target "$CSM_TARGET"
+            end
         end
+    end
+
+    if test -z "$target"
+        echo ""
+        echo "Masukkan path drive target secara lengkap, contoh: /mnt/DataCachyOS"
+        echo "Jangan gunakan spasi pada path (pacman CacheDir tidak mendukung spasi)."
+        read -P "> " input_path
+
+        switch "$input_path"
+            case "" q Q cancel exit
+                echo "[CANCELLED] Proses wizard dibatalkan oleh pengguna."
+                return 0
+        end
+        set target "$input_path"
+    end
+
+    # --- Validasi ---
+    echo ""
+    if not __csm_init_validate_drive "$target"
+        return 1
+    end
+
+    set -l root "$target/"(csm_root_name)
+
+    echo ""
+    echo "Struktur folder yang akan dibuat di bawah:"
+    echo "  $root/"
+    echo "    ├── apps/           (launcher, Wine prefixes)"
+    echo "    ├── cache/          (user, paru, pacman)"
+    echo "    ├── dev/            (development tools)"
+    echo "    ├── flatpak/"
+    echo "    │   ├── flatpak-data/       (data user)"
+    echo "    │   └── flatpak-core/       (placeholder, isi manual)"
+    echo "    ├── shader-cache/"
+    echo "    └── system/"
+    echo ""
+
+    if not csm_confirm "Lanjut?" "Y"
+        echo "Dibatalkan."
+        return 1
+    end
+
+    # --- Backup + tulis config ---
+    if test -f "$cfg"
         set -l backup (csm_config_backup)
         if test -n "$backup"
             csm_ok "Backup: $backup"
         end
     end
 
-    echo ""
-    echo "Drive target (contoh: /mnt/DataCachyOS)"
-    read -P "> " target
-
-    if test -z "$target"
-        csm_error "Tidak ada input."
+    if not __csm_init_create_layout "$root"
+        csm_error "Gagal membuat struktur folder."
         return 1
     end
-
-    echo ""
-    if not __csm_init_validate_drive "$target"
-        return 1
-    end
-
-    set -l root "$target/CachyOS-Storage-Data-Migration"
-
-    echo ""
-    echo "Struktur folder yang akan dibuat:"
-    echo "  $root/"
-    echo "    ├── Flatpak/"
-    echo "    │   ├── Flatpak Core/   (installation, isi manual dengan sudo)"
-    echo "    │   └── Flatpak Data/   (data user)"
-    echo "    ├── paru/"
-    echo "    ├── pacman/             (reserved)"
-    echo "    └── data cache/         (reserved)"
-    echo ""
-
-    if not csm_confirm "Lanjut?" "Y"
-        return 1
-    end
-
-    mkdir -p "$root/flatpak/system" \
-             "$root/flatpak" \
-             "$root/paru" \
-             "$root/pacman" \
-             "$root/data cache"
     csm_ok "Folder dibuat"
 
     __csm_init_write_config "$target"
     csm_ok "Config ditulis ke $cfg"
 
-    # Reload in current process so migrate below uses new paths.
+    # Reload di proses ini agar migrasi di bawah memakai path baru.
     source "$cfg"
     csm_normalize_config
 
+    # --- Migrasi ---
     echo ""
-    if csm_confirm "Migrate data yang ada sekarang?" "Y"
+    if csm_confirm "Migrasikan data yang ada sekarang?" "Y"
         echo ""
-        csm_flatpak_migrate
+        if functions -q csm_cache_migrate; csm_cache_migrate; end
+        if functions -q csm_apps_migrate; csm_apps_migrate; end
+        if functions -q csm_system_migrate; csm_system_migrate; end
+        if functions -q csm_dev_migrate; csm_dev_migrate; end
+        if functions -q csm_steam_migrate; csm_steam_migrate; end
+        if functions -q csm_flatpak_migrate; csm_flatpak_migrate; end
+        if functions -q csm_paru_migrate; csm_paru_migrate; end
+
+        # pacman butuh sudo. Modulnya sudah meminta konfirmasi sendiri.
+        if functions -q csm_pacman_migrate
+            echo ""
+            if csm_confirm "Migrasikan cache pacman sekarang? (butuh sudo)" "N"
+                csm_pacman_migrate
+            end
+        end
+
         echo ""
-        csm_paru_migrate
+        if functions -q csm_sync_symlinks
+            csm_sync_symlinks
+        end
     end
 
+    # --- Watcher ---
     echo ""
     echo "Flatpak watcher service:"
-    set -l enable_watch 1
-    if set -q CSM_FLATPAK_WATCH
-        set enable_watch "$CSM_FLATPAK_WATCH"
-    end
+    set -l enable_watch (__csm_default_or CSM_FLATPAK_WATCH 1)
 
-    if command -sq systemctl
+    if csm_have systemctl
         systemctl --user daemon-reload 2>/dev/null
         if test "$enable_watch" = "1"
-            systemctl --user enable --now csm-flatpak-watcher.service 2>/dev/null
-            if test $status -eq 0
+            if systemctl --user enable --now csm-flatpak-watcher.service 2>/dev/null
                 csm_ok "Watcher diaktifkan"
             else
                 csm_warn "Watcher tidak bisa diaktifkan (mungkin belum di-install via setup.fish)"
@@ -281,6 +363,7 @@ function csm_setup
     echo ""
     echo "Langkah berikutnya:"
     echo "  csm status"
+    echo "  csm doctor"
     echo "  csm flatpak status"
     echo "  csm edit open"
 end
@@ -298,9 +381,7 @@ function csm_relocate
         return 1
     end
 
-    if not csm_load_config
-        return 1
-    end
+    csm_require_config; or return 1
 
     set -l old_drive "$CSM_TARGET"
     if test "$old_drive" = "$new_drive"
@@ -319,16 +400,12 @@ function csm_relocate
     end
 
     set -l old_root "$CSM_ROOT"
-    if test -z "$old_root"
-        set old_root "$old_drive/CachyOS-Storage-Data-Migration"
-    end
-    set -l new_root "$new_drive/CachyOS-Storage-Data-Migration"
+    set -l new_root "$new_drive/"(csm_root_name)
 
     set -l old_flatpak "$CSM_FLATPAK_DIR"
     set -l old_paru "$CSM_PARU_DIR"
-    set -l new_flatpak "$new_root/flatpak"
-    set -l new_flatpak_core "$new_root/flatpak/system"
-    set -l new_paru "$new_root/paru"
+    set -l new_flatpak "$new_root/flatpak/flatpak-data"
+    set -l new_paru "$new_root/cache/paru"
 
     echo ""
     echo "Data yang akan dipindah:"
@@ -360,17 +437,27 @@ function csm_relocate
         csm_ok "Config backup: $backup"
     end
 
-    # Prepare new folders
-    mkdir -p "$new_flatpak" "$new_flatpak_core" "$new_paru"
+    # Siapkan folder baru
+    if not __csm_init_create_layout "$new_root"
+        csm_error "Gagal membuat struktur folder di $new_root"
+        if test "$watcher_was_active" = "1"
+            __csm_init_watcher_start
+        end
+        return 1
+    end
 
-    # Relocate modules
+    # Pindahkan modul
     echo ""
     echo "[ 1/2 ] flatpak"
-    csm_flatpak_relocate "$old_flatpak" "$new_flatpak"
+    if functions -q csm_flatpak_relocate
+        csm_flatpak_relocate "$old_flatpak" "$new_flatpak"
+    end
 
     echo ""
     echo "[ 2/2 ] paru"
-    csm_paru_relocate "$old_paru" "$new_paru"
+    if functions -q csm_paru_relocate
+        csm_paru_relocate "$old_paru" "$new_paru"
+    end
 
     # Update config
     __csm_init_write_config "$new_drive"
@@ -382,7 +469,7 @@ function csm_relocate
         csm_ok "Watcher di-restart"
     end
 
-    # Ask about old data
+    # Tanya soal data lama
     echo ""
     if test -d "$old_root"
         if csm_confirm "Hapus data lama di \"$old_root\"?" "N"
@@ -413,7 +500,7 @@ function csm_edit
 
     switch "$action"
 
-        case "" "show"
+        case "" show
             if not test -f "$cfg"
                 csm_error "Config tidak ada: $cfg"
                 echo "Jalankan: csm setup"
@@ -423,7 +510,7 @@ function csm_edit
             echo ""
             cat "$cfg"
 
-        case "open" "edit"
+        case open edit
             if not test -f "$cfg"
                 csm_error "Config tidak ada: $cfg"
                 echo "Jalankan: csm setup"
@@ -431,9 +518,9 @@ function csm_edit
             end
             set -l editor "$EDITOR"
             if test -z "$editor"
-                if command -sq nano
+                if csm_have nano
                     set editor nano
-                else if command -sq vi
+                else if csm_have vi
                     set editor vi
                 else
                     csm_error "Tidak ada editor. Set \$EDITOR."
@@ -442,24 +529,29 @@ function csm_edit
             end
             $editor "$cfg"
 
-        case "validate"
+        case validate
             if not test -f "$cfg"
                 csm_error "Config tidak ada: $cfg"
                 return 1
             end
-            source "$cfg"
-            csm_normalize_config
+            csm_load_config
 
             echo "Validasi config:"
             echo ""
-            echo "  CSM_TARGET       : $CSM_TARGET"
-            echo "  CSM_ROOT         : $CSM_ROOT"
-            echo "  CSM_FLATPAK_DIR  : $CSM_FLATPAK_DIR"
-            echo "  CSM_PARU_DIR     : $CSM_PARU_DIR"
+            echo "  CSM_TARGET            : $CSM_TARGET"
+            echo "  CSM_ROOT              : $CSM_ROOT"
+            echo "  CSM_FLATPAK_DIR       : $CSM_FLATPAK_DIR"
+            echo "  CSM_FLATPAK_CORE_DIR  : $CSM_FLATPAK_CORE_DIR"
+            echo "  CSM_FLATPAK_INSTALLATION : $CSM_FLATPAK_INSTALLATION"
+            echo "  CSM_PARU_DIR          : $CSM_PARU_DIR"
+            echo "  CSM_PACMAN_DIR        : $CSM_PACMAN_DIR"
+            echo "  CSM_CACHE_DIR         : $CSM_CACHE_DIR"
+            echo "  CSM_WINEPREFIX_DIR    : $CSM_WINEPREFIX_DIR"
+            echo "  CSM_SHADERCACHE_DIR   : $CSM_SHADERCACHE_DIR"
             echo ""
 
             set -l fail 0
-            for var in CSM_TARGET CSM_ROOT CSM_FLATPAK_DIR CSM_PARU_DIR
+            for var in CSM_TARGET CSM_ROOT CSM_FLATPAK_DIR CSM_PARU_DIR CSM_PACMAN_DIR CSM_CACHE_DIR
                 if not set -q $var
                     csm_warn "$var tidak di-set"
                     set fail 1
@@ -476,15 +568,18 @@ function csm_edit
                 else
                     csm_warn "Target tidak mounted: $CSM_TARGET"
                 end
+                if string match -q '* *' "$CSM_TARGET"
+                    csm_warn "CSM_TARGET mengandung spasi - modul pacman akan menolaknya."
+                end
             end
 
-        case "help" "-h" "--help"
+        case help -h --help
             echo "Usage:"
             echo "  csm edit              Tampilkan config"
             echo "  csm edit open         Buka di \$EDITOR"
             echo "  csm edit validate     Validasi config"
 
-        case "*"
+        case '*'
             csm_error "Unknown action: $action"
             return 1
     end
