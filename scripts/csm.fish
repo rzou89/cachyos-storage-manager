@@ -34,6 +34,7 @@ function csm_usage
     echo "  csm apps     [status|migrate]"
     echo "  csm dev      [status|migrate]"
     echo "  csm system   [status|migrate]"
+    echo "  csm scan     [--list]             Pindai & tawarkan migrasi interaktif"
     echo ""
     echo "Config:"
     echo "  csm edit [show|open|validate]   Lihat / sunting / validasi config"
@@ -150,6 +151,9 @@ function csm_main
 
         case system
             csm_dispatch system status $rest
+
+        case scan
+            csm_scan $rest
 
         case '*'
             csm_error "Unknown command: $cmd"

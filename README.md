@@ -81,8 +81,22 @@ csm setup                 Wizard setup pertama kali
 csm status                Dashboard pemakaian storage per kategori
 csm doctor                Cek dependensi & kesehatan servis
 csm restore               Kembalikan data yang didukung ke drive lokal
+csm scan                  Pindai & tawarkan migrasi interaktif
+csm scan --list           Pindai saja, tanpa menawarkan migrasi
 csm version               Tampilkan versi
 ```
+
+### Modul `scan`
+
+`csm scan` memindai folder besar di `$HOME` yang bisa dipindah, menandai tiap
+kandidat sebagai **AMAN** (cache yang bisa dibuat ulang) atau **HATI-HATI**
+(bisa berisi konfigurasi, save, atau state aplikasi), lalu menawarkan tiga
+mode: pindahkan semua, hanya yang AMAN, atau AMAN plus pilihan HATI-HATI.
+
+Inventori dibangun dari `csm_managed_items`, whitelist cache, data per-aplikasi
+Flatpak, clone AUR paru, dan cache paket pacman — jadi tidak menduplikasi
+daftar di modul lain. Folder kosong dan aplikasi yang sedang berjalan tidak
+ditawarkan.
 
 ### Konfigurasi
 
